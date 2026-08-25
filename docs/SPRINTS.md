@@ -11,6 +11,24 @@
 각 Sprint는 `TODO` / `READY` / `IN PROGRESS` / `BLOCKED` / `DONE` 중 하나의 상태를 가진다.
 **한 번에 하나의 Sprint만 `IN PROGRESS`가 될 수 있다.**
 
+### 임시 Sprint 순서 (2026-08-25, D-021)
+
+Product Owner 가 Mac 을 보유하지 않아 실기기 검증을 수행할 수 없다.
+**실기기 의존 Sprint 를 뒤로 미루고 CI 만으로 완결되는 Sprint 를 먼저 진행한다.**
+
+```
+7 — Feedback / Local Preference   ← 다음
+8 — Backend Foundation
+9 — AI Rest Director
+10 — AI UX
+```
+
+⛔ **BLOCKED backlog** — 실기기 환경 확보 전까지 진행하지 않는다
+Sprint 3 Gate B · Sprint 4 Brightness · Sprint 5 Notification
+
+> Sprint 3 의 BLOCKED 는 **실패가 아니라 외부 환경 dependency** 다.
+> Gate A 는 통과했고 DONE 조건은 변경하지 않는다.
+
 ### 현재 상태 요약 (2026-08-24)
 
 | Sprint | 이름 | 상태 |
@@ -18,11 +36,11 @@
 | 0 | 개발 환경 및 저장소 기초 | ✅ **DONE** (2026-08-25) — CI가 AC 6개 전부 충족 |
 | 1 | Foundation & RestPlan | ✅ **DONE** (2026-08-25) — CI 통과 |
 | 2 | Timer Engine | ✅ **DONE** (2026-08-25) — CI 통과 |
-| 3 | Audio PoC | 🟡 **IMPLEMENTED / DEVICE VERIFICATION BLOCKED** |
-| 4 | Brightness & Minimal Screen | TODO |
-| 5 | Local Notification | TODO |
+| 3 | Audio PoC | 🟡 **IMPLEMENTED / DEVICE VERIFICATION BLOCKED** — Gate A 완료, Gate B 환경 없음 (D-021) |
+| 4 | Brightness & Minimal Screen | ⛔ **BLOCKED** — 실기기 필요 (D-021) |
+| 5 | Local Notification | ⛔ **BLOCKED** — 실기기 필요 (D-021) |
 | 6 | RestPlanExecutor 통합 | TODO |
-| 7 | Feedback & Local Personalization Base | TODO |
+| 7 | Feedback & Local Personalization Base | 🔜 **NEXT** — 계획 제시, 승인 대기 (D-021) |
 | 8 | Backend Skeleton | TODO |
 | 9 | OpenAI Rest Director | TODO |
 | 10 | Minimal AI UX | TODO |
@@ -745,4 +763,5 @@ OpenAI Key를 앱에 넣지 않는 서버 구조를 만든다.
 | B-007 | 앱 프로세스 종료 후 쉼 세션 복원 (session persistence) | Sprint 2 | 대기 — Sprint 2 범위 밖으로 분리 (D-015) |
 | B-008 | CI artifact 크기 — 테스트 실패 시 `.xcresult` 로 55MB 까지 커진다 | Sprint 3 | 대기 — 동작엔 지장 없음 |
 | B-009 | Rest Engine 의 audio failure fallback — SILENCE 또는 다른 Rest Block 으로 교체 | Sprint 3 | 대기 — Rest Engine Sprint 에서 (D-019) |
+| B-010 | TestFlight 배포 — Mac 없이 iPhone 설치 경로 확보. Gate B·Sprint 4·5 를 한 번에 푼다 | Sprint 3 | **PO 결정 필요** — Apple Developer Program 연 $99 (D-021) |
 | B-004 | 저장소 라이선스 결정 | Sprint 0 | 대기 — Product Owner 결정 필요 |

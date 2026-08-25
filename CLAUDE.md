@@ -227,7 +227,15 @@ CI 결과를 확인하지 않은 상태에서 빌드·테스트가 통과했다�
 | 0 — 개발 환경 및 저장소 기초 | ✅ DONE | [Run #1](https://github.com/musi0905-cloud/shim-ios/actions/runs/32792825752) |
 | 1 — Foundation & RestPlan | ✅ DONE | [Run #4](https://github.com/musi0905-cloud/shim-ios/actions/runs/32794940622) — 37 tests |
 | 2 — Timer Engine | ✅ DONE | [Run #6](https://github.com/musi0905-cloud/shim-ios/actions/runs/32796901669) — 64 tests |
-| 3 — Audio PoC | 🟡 **IMPLEMENTED / DEVICE VERIFICATION BLOCKED** | Gate A: [Run #8](https://github.com/musi0905-cloud/shim-ios/actions/runs/32798630436) — 103 tests / Gate B: 대기 |
+| 3 — Audio PoC | 🟡 **IMPLEMENTED / DEVICE VERIFICATION BLOCKED** | Gate A: [Run #8](https://github.com/musi0905-cloud/shim-ios/actions/runs/32798630436) — 103 tests / Gate B: 환경 없음 |
+| 4 — Brightness | ⛔ BLOCKED | 실기기 필요 |
+| 5 — Notification | ⛔ BLOCKED | 실기기 필요 |
+| **7 — Feedback** | 🔜 **NEXT** | 계획 제시, 승인 대기 |
+
+**임시 Sprint 순서 (D-021)**: 7 → 8 → 9 → 10.
+Product Owner 가 Mac 을 보유하지 않아 실기기 검증이 불가능하다.
+실기기 의존 Sprint(3 Gate B · 4 · 5)는 환경 확보 전까지 BLOCKED backlog 로 둔다.
+**이 BLOCKED 는 실패가 아니라 외부 환경 dependency 다.** DONE 조건은 변경하지 않는다.
 
 **다음 Sprint 는 Product Owner 승인 후 시작한다.** (운영규칙 §3)
 

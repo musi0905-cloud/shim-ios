@@ -937,3 +937,67 @@ INFOPLIST_FILE = Shim-Info.plist
 번들 산출물을 직접 확인하는 테스트를 함께 둔다.
 설정이 조용히 무시되는 경우가 실제로 있다.
 
+---
+
+## D-021. Sprint 순서를 임시 재배치한다 — 실기기 의존 Sprint 를 뒤로 미룬다
+
+- **Sprint**: 3 이후 운영
+- **상태**: **확정** (Product Owner 결정, 2026-08-25)
+- **문제 구분**: C — 개발 환경 제약
+
+### 확인된 환경
+
+**Product Owner 는 iPhone 은 보유하고 있으나 Mac 이 없다.**
+
+iPhone 에 개발 중인 앱을 설치하려면 Xcode 가 필요하고, Xcode 는 macOS 전용이다.
+따라서 `docs/DEVICE_VERIFICATION.md` 의 절차를 실행할 수 없다.
+
+CI 의 macOS runner 는 Simulator 만 제공하며 물리 기기를 연결할 수 없다.
+**Simulator 는 실기기가 아니다.**
+
+### 이 상태는 실패가 아니다
+
+Sprint 3 의 `IMPLEMENTED / DEVICE VERIFICATION BLOCKED` 는
+**코드 결함이 아니라 외부 환경 dependency** 다.
+
+- Gate A(구현·CI)는 통과했다. 103개 테스트, `BUILD SUCCEEDED` / `TEST SUCCEEDED`.
+- Gate B(실기기)는 검증 수단 자체가 없어 수행하지 못했다.
+- **Sprint 3 의 DONE 조건은 변경하지 않는다.** 실기기 10항목 검증이 그대로 남는다.
+- 환경이 확보되면 그때 검증하고 DONE 처리한다.
+
+검증되지 않은 것을 검증됐다고 하지 않는다. 동시에 검증할 수 없다는 이유로
+프로젝트 전체를 멈추지도 않는다.
+
+### 임시 Sprint 순서
+
+| 순서 | Sprint | 실기기 필요 | 상태 |
+|---|---|---|---|
+| 1 | **7 — Feedback / Local Preference** | ❌ | 다음 진행 |
+| 2 | **8 — Backend Foundation** | ❌ | 대기 |
+| 3 | **9 — AI Rest Director** | ❌ | 대기 |
+| 4 | **10 — AI UX** | ❌ | 대기 |
+
+### BLOCKED backlog — 실기기 환경 확보 전까지 진행하지 않는다
+
+| Sprint | 항목 | 사유 |
+|---|---|---|
+| 3 Gate B | Background Audio / 화면 잠금 재생 / interruption | 실기기 전용 |
+| 4 | Brightness — `UIScreen.brightness` 적용·복원 | Simulator 의 밝기 동작이 실기기와 다르다 |
+| 5 | Local Notification — 종료 알림 수신 | 실기기 검증 필요 |
+
+### 원래 순서로 돌아가는 조건
+
+Mac 을 확보하거나, `docs/DEVICE_VERIFICATION.md` 절차를 실행할 수 있는
+다른 경로가 생기면 **Sprint 3 Gate B → 4 → 5** 를 먼저 처리한다.
+
+Mac 없이 iPhone 에 설치하는 경로로 **TestFlight 배포**가 있다 — **B-010**.
+CI 의 macOS runner 가 빌드해 App Store Connect 에 올리면 PO 는 iPhone 의
+TestFlight 앱으로 설치할 수 있다. 다만 Apple Developer Program(연 $99)과
+서명 인증서·API Key 관리가 필요하다. 별도 Sprint 규모의 작업이므로
+Product Owner 결정 사항으로 남긴다.
+
+### 운영 원칙은 그대로다
+
+재배치해도 한 번에 하나의 Sprint 만 진행한다.
+CI build/test 성공 후 DONE 처리한다. (운영규칙 §3)
+

@@ -10,6 +10,12 @@ CI 는 실기기를 대체할 수 없다. Simulator 는 실기기가 아니다.
 
 ---
 
+> ⚠️ **현재 이 절차를 실행할 수 없다 (2026-08-25).**
+> Product Owner 는 iPhone 은 보유하고 있으나 **Mac 이 없다.**
+> iPhone 에 개발 중인 앱을 설치하려면 Xcode 가 필요하고 Xcode 는 macOS 전용이다.
+> Sprint 3 Gate B · Sprint 4 · Sprint 5 는 환경 확보 전까지 BLOCKED 다 (D-021).
+> Mac 없이 설치하는 경로로 TestFlight 가 있다 — B-010, Product Owner 결정 대기.
+
 ## 준비 — iPhone 에 앱 설치하기
 
 Simulator 빌드에는 Apple Developer 계정이 필요 없지만 **실기기 설치에는 필요하다.**
