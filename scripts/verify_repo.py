@@ -436,6 +436,60 @@ def check_ci_workflow() -> None:
         ok(f"CI 워크플로: Sprint 0 검증 요건 {len(required)}종 모두 포함")
 
 
+# ------------------------------------------- 6.6 Sprint 범위 가드
+def check_sprint_scope() -> None:
+    """현재 Sprint 범위를 벗어난 파일이 생기지 않았는지 확인한다.
+
+    운영규칙 §3 — "현재 Sprint 가 완료되기 전에 다음 Sprint 코드를 구현하지 않는다."
+    Sprint 1 지시 7 — AudioService / TimerService / BrightnessService /
+    NotificationService 는 생성하지 않는다.
+    """
+    out_of_scope = {
+        "AudioService": "Sprint 3 (Audio PoC)",
+        "TimerService": "Sprint 2 (Timer Engine)",
+        "BrightnessService": "Sprint 4 (Brightness)",
+        "NotificationService": "Sprint 5 (Local Notification)",
+        "RestPlanExecutor": "Sprint 6 (Executor 통합)",
+    }
+
+    swift_files = []
+    for root, dirs, files in os.walk(rel("ios")):
+        dirs[:] = [d for d in dirs if not d.endswith(".xcodeproj")]
+        swift_files.extend(
+            os.path.join(root, f) for f in files if f.endswith(".swift")
+        )
+
+    found = []
+    for name, sprint in out_of_scope.items():
+        for path in swift_files:
+            if os.path.basename(path) == f"{name}.swift":
+                found.append(f"{os.path.relpath(path, REPO)} — {name} 은 {sprint} 범위")
+
+    if found:
+        for f in found:
+            fail(f"Sprint 범위 밖 파일: {f}")
+    else:
+        ok(f"Sprint 범위 준수 — 이후 Sprint 타입 {len(out_of_scope)}종 미생성")
+
+    # 도메인 계층이 iOS 시스템 프레임워크에 의존하지 않는지 확인한다.
+    # docs/IOS_SPEC.md §4.1 — UI 는 시스템 API 를 직접 호출하지 않는다.
+    forbidden_imports = ("import UIKit", "import AVFoundation", "import UserNotifications")
+    leaks = []
+    for path in swift_files:
+        rel_path = os.path.relpath(path, REPO)
+        if "/Models/" not in path and "/Engine/" not in path:
+            continue
+        content = read(path)
+        for imp in forbidden_imports:
+            if imp in content:
+                leaks.append(f"{rel_path}: {imp}")
+    if leaks:
+        for leak in leaks:
+            fail(f"Domain 계층이 시스템 프레임워크에 의존: {leak}")
+    else:
+        ok("Domain 계층(Models/·Engine/)이 시스템 프레임워크에 의존하지 않음")
+
+
 def check_gitignore() -> None:
     text = read(rel(".gitignore"))
     required = [".env", "*.p12", "*.mobileprovision", "AuthKey_*.p8", "xcuserdata/", "DerivedData/"]
@@ -459,6 +513,7 @@ def main() -> int:
     check_scheme()
     check_spec_consistency()
     check_ci_workflow()
+    check_sprint_scope()
     check_gitignore()
     check_secrets(tracked_files())
 

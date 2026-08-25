@@ -369,3 +369,156 @@ Sprint 0의 Acceptance Criteria에 **AC-6 — Unit Test 성공**을 추가한다
 
 > Google Drive 원본 문서가 최상위 기준이므로, `04_쉼 Sprint Backlog v0.1`의 Sprint 0 항목에도
 > 이 변경을 반영하는 것이 좋다. (운영규칙 §13 — 제품 결정이 바뀌면 구현보다 문서를 먼저 갱신한다)
+
+---
+
+## D-010. RestPlan 스키마는 `docs/PRODUCT.md` §5 의 JSON 계약을 따른다
+
+- **Sprint**: 1
+- **상태**: **확정** (Product Owner 지시, 2026-08-25)
+- **문제 구분**: D — 제품 결정 필요
+
+### 배경 — 두 문서의 필드 이름이 달랐다
+
+| `docs/PRODUCT.md` §5 (AI 반환 JSON) | `docs/IOS_SPEC.md` §5 (앱 모델) |
+|---|---|
+| `duration_minutes` | `durationSeconds` |
+| `rest_type` | `restType` |
+| `audio` | `audioMode` |
+| `brightness` | `targetBrightness` |
+| `screen_mode` / `watch_guidance` / `end_checkin` | `screenMode` / — / `endCheckin` |
+| — | `id`, `guidanceMessages` |
+
+### 결정
+
+**`docs/PRODUCT.md` §5 의 이름과 snake_case JSON 키를 채택한다.**
+
+근거:
+1. 운영규칙 §0 의 문서 우선순위 — 제품 기준서 > iOS 개발 명세서.
+2. Product Owner 가 제시한 struct 가 PRODUCT.md 쪽과 일치한다.
+3. 이 스키마는 **AI Structured Output 의 계약**이다. AI 가 만들 JSON 을 기준으로
+   이름을 정하는 편이 변환 계층을 줄인다.
+
+`IOS_SPEC.md` 에만 있던 `id` 와 `guidanceMessages` 는 **기본값이 있는 선택 필드로 추가**했다.
+`durationSeconds` 는 저장하지 않고 `durationMinutes` 에서 **파생**시킨다.
+두 값을 각각 저장하면 어긋날 수 있고, 계약은 분 단위이며 실행 계층(TimerService)만 초 단위를 쓰기 때문이다.
+
+### 필드별 필수 여부
+
+| 필드 | 필수 | 기본값 |
+|---|---|---|
+| `duration_minutes` `rest_type` `audio` `movement` `screen_mode` | ✅ 필수 | — |
+| `brightness` | 선택 | `nil` (밝기를 바꾸지 않음) |
+| `watch_guidance` | 선택 | `false` |
+| `end_checkin` | 선택 | `true` |
+| `guidance_messages` | 선택 | `[]` |
+| `id` | 선택 | 앱이 UUID 생성 |
+
+### 알 수 없는 enum 값은 **거부**한다
+
+`docs/IOS_SPEC.md` §5 는 "안전한 기본값으로 대체하거나 **실행을 거부**한다" 두 가지를 허용한다.
+둘 중 **거부**를 택했다.
+
+- 조용히 기본값으로 바꾸면 AI 가 계약에 없는 값을 보내도 아무도 모른다.
+  잘못된 프롬프트나 스키마 드리프트가 그대로 굳는다.
+- 거부하면 Backend 로그와 앱 오류로 즉시 드러난다.
+- 사용자 영향은 Sprint 10 의 fallback 이 흡수한다 — "AI 실패 시에도 기본 쉼을 시작할 수 있다."
+
+반면 **숫자 범위는 보정(clamp)** 한다. 값의 의미는 맞고 범위만 벗어난 경우이며,
+밝기 문제로 쉼 전체가 실패해서는 안 되기 때문이다 (`IOS_SPEC.md` §7.3).
+
+### 실행 파이프라인
+
+```
+AI JSON
+  ↓  RestPlan decoding      Models/RestPlan.swift        — 계약 위반이면 throw
+  ↓  RestPlan validation    Engine/RestPlanValidator.swift — 거부 또는 보정
+  ↓  RestEngine             (이후 Sprint)
+  ↓  Execution Layer        (Sprint 2~6)
+```
+
+검증을 통과한 계획만 `ValidatedRestPlan` 타입이 된다.
+실행 계층은 `RestPlan` 이 아니라 `ValidatedRestPlan` 만 받는다.
+**검증되지 않은 계획이 실행되는 경로를 타입 수준에서 막기 위해서다.**
+
+### 스키마 변경 시 함께 갱신할 것
+
+`Models/RestPlan.swift` · `Models/RestPlanEnums.swift` · Backend JSON Schema ·
+`docs/PRODUCT.md` §5 · `docs/IOS_SPEC.md` §5
+
+---
+
+## D-011. RestPlan enum 어휘는 명세에 등장하는 값만 정의한다
+
+- **Sprint**: 1
+- **상태**: **제안 — 어휘 확정은 Product Owner 결정 필요**
+- **문제 구분**: D
+
+### 결정
+
+Product Owner 지시 — "enum 값은 향후 확장을 고려하되 현재 명세에 없는 값을 임의로 많이 만들지 않는다."
+
+각 case 는 출처를 주석으로 남겼다.
+
+| enum | case | 출처 |
+|---|---|---|
+| `RestType` | `environment_reset` | PRODUCT.md §5, IOS_SPEC.md §5 예시 |
+| `AudioMode` | `calm_acoustic` | PRODUCT.md §5 예시 |
+| | `nature_sound` | PRODUCT.md §6 Rest Blocks `NATURE_SOUND` |
+| | `silence` | PRODUCT.md §6 Rest Blocks `SILENCE` |
+| `MovementType` | `slow_walk` | PRODUCT.md §5, IOS_SPEC.md §5 예시 |
+| | `stretch` | PRODUCT.md §6 Rest Blocks `STRETCH` |
+| | `none` | PRODUCT.md §6 규칙 (이동 불가 상황) |
+| `ScreenMode` | `minimal` | IOS_SPEC.md §8.2 |
+| | `dark` | PRODUCT.md §6 Rest Blocks `DARK_SCREEN` |
+
+### Product Owner 결정 필요 — `RestType` 어휘
+
+**`RestType` 에 명세가 제시하는 값은 `environment_reset` 하나뿐이다.**
+지시 3에 따라 임의로 늘리지 않았으나, case 가 하나면 AI 가 쉼의 유형을 구분할 수 없다.
+
+`docs/PRODUCT.md` §6 의 Rest Blocks 10종(`WALK` `MUSIC` `NATURE_SOUND` `BREATHING`
+`STRETCH` `SILENCE` `DARK_SCREEN` `WATCH_GUIDE` `NO_PHONE` `SHORT_REFLECTION`)은
+*쉼의 구성 요소*이지 *쉼의 유형*이 아니라서 그대로 `RestType` 에 넣기 어렵다.
+
+Sprint 9(OpenAI Rest Director) 전까지 다음 중 하나를 결정해야 한다.
+
+- **1안** — `RestType` 어휘를 PO 가 확정한다 (예: `environment_reset` / `cognitive_reset` / `social_reset`).
+  AI 가 상태 유형을 분류하는 축이 생긴다. 제품 기준서 갱신이 필요하다.
+- **2안** — `RestType` 을 없애고 Rest Blocks 조합으로만 표현한다.
+  PRODUCT.md §6 의 Rest Engine 설계와 더 가깝지만 계약이 커진다.
+- **3안** — 현행 유지. Sprint 9 에서 실제 AI 출력을 보고 결정한다.
+
+> Claude Code 는 승인 없이 제품 어휘를 늘리지 않는다 (운영규칙 §12).
+
+---
+
+## D-012. Sprint 1 에 RestPlanValidator 를 앞당겨 구현한다
+
+- **Sprint**: 1
+- **상태**: **확정** (Product Owner 지시, 2026-08-25)
+- **문제 구분**: D
+
+### 배경
+
+`docs/SPRINTS.md` 상 `RestPlanValidator` 는 Sprint 6(RestPlanExecutor 통합) 항목이었다.
+
+### 결정
+
+Product Owner 지시로 Sprint 1 에 앞당긴다.
+
+> "brightness 처럼 기기 기능과 직접 연결되는 값도 AI 가 아무 숫자나 주는 구조가 아니라
+> 앱이 validation 하는 구조로 가야 해. 이 흐름을 Sprint 1부터 깔아두면 이후 Sprint 가 훨씬 편해져."
+
+### 근거
+
+- Validator 는 시스템 프레임워크에 의존하지 않는 **순수 규칙**이다. Service 없이 구현·테스트할 수 있다.
+- 실행 계층이 `ValidatedRestPlan` 만 받도록 타입을 먼저 고정해두면,
+  Sprint 2~6 에서 Service 를 붙일 때 검증 우회 경로가 생기지 않는다.
+- 나중에 끼워 넣으면 이미 작성된 호출부를 전부 고쳐야 한다.
+
+### Sprint 6 에 남는 것
+
+`RestPlanExecutor` 본체, Service 의존성 주입, 시작·종료·취소 오케스트레이션, 통합 테스트.
+Validator 는 Sprint 6 에서 Executor 가 호출하기만 하면 된다.
+
