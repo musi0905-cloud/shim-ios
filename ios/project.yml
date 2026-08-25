@@ -50,6 +50,10 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        # Background Audio (Sprint 3, D-017).
+        # .playback 세션과 함께 있어야 앱이 background 로 가거나 화면이
+        # 잠겨도 재생이 이어진다. 실제 동작은 실기기에서만 검증 가능하다.
+        INFOPLIST_KEY_UIBackgroundModes: audio
 
   ShimTests:
     type: bundle.unit-test

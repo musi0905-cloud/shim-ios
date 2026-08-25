@@ -81,6 +81,8 @@ def check_required_files() -> None:
         "scripts/mac_verify.sh",
         "scripts/ci/select_simulator.py",
         "scripts/sprint_files.sh",
+        "scripts/generate_test_audio.py",
+        "ios/Shim/Resources/Audio/test_ambient.wav",
         ".github/workflows/ios-sprint0-verify.yml",
     ]
     missing = [p for p in required if not os.path.exists(rel(p))]
@@ -359,6 +361,10 @@ def check_secrets(files: list[str]) -> None:
         path = os.path.join(REPO, f)
         if not os.path.isfile(path):
             continue
+        # 음원·이미지 같은 바이너리는 텍스트 스캔 대상이 아니다.
+        if f.lower().endswith((".wav", ".mp3", ".m4a", ".aiff", ".caf",
+                               ".png", ".jpg", ".jpeg", ".pdf", ".ttf", ".otf")):
+            continue
         try:
             if os.path.getsize(path) > 5_000_000:
                 continue
@@ -442,12 +448,12 @@ def check_sprint_scope() -> None:
     """현재 Sprint 범위를 벗어난 파일이 생기지 않았는지 확인한다.
 
     운영규칙 §3 — "현재 Sprint 가 완료되기 전에 다음 Sprint 코드를 구현하지 않는다."
-    Sprint 2 지시 10 — Audio / Brightness / Notification / OpenAI /
-    Location / Watch 는 이번 Sprint 에서 구현하지 않는다.
-    (TimerService 는 Sprint 2 에서 허용되어 목록에서 제외했다.)
+    Sprint 3 지시 — Brightness / Notification / OpenAI / Location / Watch 는
+    이번 Sprint 에서 구현하지 않는다.
+    (TimerService 는 Sprint 2, AudioService 는 Sprint 3 에서 허용되어
+     목록에서 제외했다.)
     """
     out_of_scope = {
-        "AudioService": "Sprint 3 (Audio PoC)",
         "BrightnessService": "Sprint 4 (Brightness)",
         "NotificationService": "Sprint 5 (Local Notification)",
         "RestPlanExecutor": "Sprint 6 (Executor 통합)",
@@ -472,28 +478,41 @@ def check_sprint_scope() -> None:
     else:
         ok(f"Sprint 범위 준수 — 이후 Sprint 타입 {len(out_of_scope)}종 미생성")
 
-    # 도메인 계층이 iOS 시스템 프레임워크에 의존하지 않는지 확인한다.
-    # docs/IOS_SPEC.md §4.1 — UI 는 시스템 API 를 직접 호출하지 않는다.
-    forbidden_imports = (
-        "import UIKit",
-        "import SwiftUI",
-        "import AVFoundation",
-        "import UserNotifications",
-    )
+    # 계층별로 금지하는 import 가 다르다. (docs/IOS_SPEC.md §4.1)
+    #
+    #   Models/ Engine/ — 순수 도메인. 어떤 시스템 프레임워크도 몰라야 한다.
+    #   Services/       — 시스템 프레임워크를 쓰는 것이 존재 이유다.
+    #                     다만 UI 는 몰라야 한다.
+    #   Features/       — UI 계층. 시스템 API 를 직접 부르지 않는다.
+    layer_rules = [
+        (("/Models/", "/Engine/"), "Domain",
+         ("import UIKit", "import SwiftUI", "import AVFoundation",
+          "import UserNotifications")),
+        (("/Services/",), "Service",
+         ("import UIKit", "import SwiftUI")),
+        (("/Features/",), "UI",
+         ("import AVFoundation", "import UserNotifications")),
+    ]
+
     leaks = []
+    checked = 0
     for path in swift_files:
         rel_path = os.path.relpath(path, REPO)
-        if not any(seg in path for seg in ("/Models/", "/Engine/", "/Services/")):
-            continue
-        content = read(path)
-        for imp in forbidden_imports:
-            if imp in content:
-                leaks.append(f"{rel_path}: {imp}")
+        for segments, layer, forbidden in layer_rules:
+            if not any(seg in path for seg in segments):
+                continue
+            checked += 1
+            content = read(path)
+            for imp in forbidden:
+                if imp in content:
+                    leaks.append(f"[{layer}] {rel_path}: {imp}")
+            break
+
     if leaks:
         for leak in leaks:
-            fail(f"Domain 계층이 시스템 프레임워크에 의존: {leak}")
+            fail(f"계층 경계 위반 — {leak}")
     else:
-        ok("Domain·Service 계층(Models/·Engine/·Services/)이 UI 프레임워크에 의존하지 않음")
+        ok(f"계층별 import 경계 준수 (검사 {checked}개 파일)")
 
 
 def check_gitignore() -> None:

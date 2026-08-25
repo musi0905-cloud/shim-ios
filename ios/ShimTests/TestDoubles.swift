@@ -67,3 +67,133 @@ final class ManualTickScheduler: TickScheduler {
         for _ in 0..<times { fire() }
     }
 }
+
+// MARK: - Sprint 3: 오디오
+
+/// 실제 소리를 내지 않는 플레이어.
+final class FakeAudioPlayerEngine: AudioPlayerEngine {
+    var isPlaying = false
+    var numberOfLoops = 0
+    var volume: Float = 0
+
+    /// `prepareToPlay()` 가 돌려줄 값. false 로 두면 준비 실패를 재현한다.
+    var prepareResult = true
+    /// `play()` 가 돌려줄 값. false 로 두면 재생 시작 실패를 재현한다.
+    var playResult = true
+
+    private(set) var prepareCallCount = 0
+    private(set) var playCallCount = 0
+    private(set) var pauseCallCount = 0
+    private(set) var stopCallCount = 0
+
+    func prepareToPlay() -> Bool {
+        prepareCallCount += 1
+        return prepareResult
+    }
+
+    func play() -> Bool {
+        playCallCount += 1
+        if playResult { isPlaying = true }
+        return playResult
+    }
+
+    func pause() {
+        pauseCallCount += 1
+        isPlaying = false
+    }
+
+    func stop() {
+        stopCallCount += 1
+        isPlaying = false
+    }
+}
+
+/// 원하는 결과를 지정할 수 있는 플레이어 공급자.
+@MainActor
+final class FakeAudioPlayerProvider: AudioPlayerProviding {
+    enum Outcome {
+        /// 정상적으로 플레이어를 준다.
+        case player(FakeAudioPlayerEngine)
+        /// 무음 모드처럼 재생할 것이 없다.
+        case silent
+        /// 오류를 던진다.
+        case failure(AudioServiceError)
+    }
+
+    var outcome: Outcome
+    private(set) var requestedModes: [AudioMode] = []
+
+    init(outcome: Outcome = .player(FakeAudioPlayerEngine())) {
+        self.outcome = outcome
+    }
+
+    func makePlayer(for mode: AudioMode) throws -> AudioPlayerEngine? {
+        requestedModes.append(mode)
+        switch outcome {
+        case let .player(engine): return engine
+        case .silent:             return nil
+        case let .failure(error): throw error
+        }
+    }
+}
+
+/// 실제 AVAudioSession 을 건드리지 않는 세션. 시스템 이벤트를 손으로 쏠 수 있다.
+@MainActor
+final class FakeAudioSession: AudioSessionConfiguring {
+    var onInterruptionBegan: (() -> Void)?
+    var onInterruptionEnded: ((Bool) -> Void)?
+    var onRouteDeviceUnavailable: (() -> Void)?
+
+    /// 활성화 시 던질 오류. nil 이면 성공한다.
+    var activationError: Error?
+
+    private(set) var activateCallCount = 0
+    private(set) var deactivateCallCount = 0
+
+    func activatePlayback() throws {
+        activateCallCount += 1
+        if let activationError { throw activationError }
+    }
+
+    func deactivate() throws {
+        deactivateCallCount += 1
+    }
+
+    // 시스템 이벤트 재현
+    func simulateInterruptionBegan() { onInterruptionBegan?() }
+    func simulateInterruptionEnded(shouldResume: Bool) { onInterruptionEnded?(shouldResume) }
+    func simulateRouteDeviceUnavailable() { onRouteDeviceUnavailable?() }
+}
+
+/// Coordinator 통합 테스트용 오디오 스텁.
+@MainActor
+final class SpyAudioService: AudioService {
+    private(set) var isPlaying = false
+
+    private(set) var prepareCallCount = 0
+    private(set) var playCallCount = 0
+    private(set) var stopCallCount = 0
+    private(set) var preparedModes: [AudioMode] = []
+
+    /// prepare 에서 던질 오류.
+    var prepareError: AudioServiceError?
+    /// play 에서 던질 오류.
+    var playError: AudioServiceError?
+
+    func prepare(mode: AudioMode) async throws {
+        prepareCallCount += 1
+        preparedModes.append(mode)
+        if let prepareError { throw prepareError }
+    }
+
+    func play() async throws {
+        playCallCount += 1
+        if let playError { throw playError }
+        isPlaying = true
+    }
+
+    func stop() {
+        stopCallCount += 1
+        isPlaying = false
+    }
+}

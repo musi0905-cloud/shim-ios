@@ -65,7 +65,8 @@ Google Drive 문서가 **최상위 제품 기준**이고, 이 저장소의 문�
     ├── Shim/                      # 앱 타깃 소스
     │   ├── ShimApp.swift          # @main 진입점
     │   ├── RootView.swift         # Sprint 0 플레이스홀더 화면
-    │   └── Assets.xcassets/       # AppIcon / AccentColor
+    │   ├── Assets.xcassets/       # AppIcon / AccentColor
+    │   └── Resources/Audio/       # 자체 생성 테스트 음원 (제품용 아님)
     │
     └── ShimTests/                 # 유닛 테스트 타깃
         └── ShimSmokeTests.swift   # 스모크 테스트
@@ -89,6 +90,27 @@ ios/Shim/
 
 ⚠️ **소스 파일을 추가한 뒤에는 반드시 `cd ios && xcodegen generate`를 다시 실행한다.**
 XcodeGen이 생성한 프로젝트는 파일을 명시적으로 나열하므로, 재생성하지 않으면 새 파일이 빌드에 포함되지 않는다.
+
+---
+
+## 테스트 오디오에 대하여
+
+`ios/Shim/Resources/Audio/test_ambient.wav`
+
+> ⚠️ **PoC 검증 목적으로 프로젝트에서 자체 생성한 테스트 오디오이며 제품용 콘텐츠가 아니다.**
+
+- `scripts/generate_test_audio.py` 가 Python 표준 라이브러리만으로 합성한다. 외부에서 내려받은 음원이 아니므로 **라이선스 문제가 없다.**
+- 30초 · 모노 · 22.05 kHz · 16-bit PCM · 약 1.3 MB · 피크 약 −18 dBFS
+- 110/165/220/330 Hz 사인 부분음과 아주 느린 음량 흔들림. 모든 주파수가 30초 안에 정수 번 진동해 무한 반복해도 이음매가 들리지 않는다.
+- 소리가 나는 모드(`calm_acoustic`, `nature_sound`)가 현재 같은 파일을 쓴다. 모드별 음원 선택은 제품 사운드를 정한 뒤의 일이다.
+
+재생성:
+
+```bash
+python3 scripts/generate_test_audio.py
+```
+
+제품 음악과 Apple Music(MusicKit) 연동은 훨씬 뒤 Sprint 에서 결정한다. → `docs/DECISIONS.md` **D-018**
 
 ---
 

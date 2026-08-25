@@ -18,7 +18,7 @@
 | 0 | 개발 환경 및 저장소 기초 | ✅ **DONE** (2026-08-25) — CI가 AC 6개 전부 충족 |
 | 1 | Foundation & RestPlan | ✅ **DONE** (2026-08-25) — CI 통과 |
 | 2 | Timer Engine | ✅ **DONE** (2026-08-25) — CI 통과 |
-| 3 | Audio PoC | READY — Product Owner 승인 대기 |
+| 3 | Audio PoC | 🟡 **IMPLEMENTED / DEVICE VERIFICATION BLOCKED** |
 | 4 | Brightness & Minimal Screen | TODO |
 | 5 | Local Notification | TODO |
 | 6 | RestPlanExecutor 통합 | TODO |
@@ -364,7 +364,7 @@ Sprint 1 코드와 무관했다. 재실행으로 넘기지 않고 원인을 고�
 
 ## Sprint 3 — Audio PoC
 
-**상태: READY** — Product Owner 승인 대기
+**상태: IMPLEMENTED / DEVICE VERIFICATION BLOCKED** (2026-08-25)
 
 ### 목표
 쉼 시작 시 로컬 오디오가 자동 재생되고 종료 시 확실히 정리되게 한다.

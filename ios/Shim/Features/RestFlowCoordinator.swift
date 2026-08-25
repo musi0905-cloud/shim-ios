@@ -7,14 +7,15 @@
 //  운영규칙 §6 — "상태는 단일 소스에서 관리"
 //  docs/IOS_SPEC.md §9 — "상태 전이는 한 곳에서 관리한다."
 //
-//  현재 범위 (Sprint 2):
-//    화면 흐름, 상태 전이, 그리고 RestTimerService 연결까지 담당한다.
-//    오디오·밝기·알림은 아직 붙이지 않는다.
+//  현재 범위 (Sprint 3):
+//    화면 흐름, 상태 전이, RestTimerService, AudioService 연결을 담당한다.
+//    밝기·알림은 아직 붙이지 않는다.
 //    Sprint 6 에서 RestPlanExecutor 가 Service 들을 묶으면 이 타입은
 //    Executor 를 호출하고 상태만 반영하는 역할로 남는다.
 //
 //  의존 방향:
 //      RestSessionView → RestFlowCoordinator → RestTimerService
+//                                            → AudioService → AVFoundation
 //
 //  이 타입은 SwiftUI 외의 iOS 시스템 프레임워크를 import 하지 않는다.
 //  덕분에 Simulator 에서 유닛 테스트로 흐름 전체를 검증할 수 있다.
@@ -53,12 +54,23 @@ final class RestFlowCoordinator: ObservableObject {
     /// tick 횟수를 누적한 값이 아니다.
     @Published private(set) var remainingSeconds: TimeInterval = 0
 
+    /// 오디오가 실패했을 때의 사용자 표시 문구. 없으면 `nil`.
+    ///
+    /// ⚠️ 오디오 실패는 **쉼을 중단시키지 않는다.** 타이머는 계속 돈다.
+    ///    소리가 없어도 "10분 동안 화면에서 벗어난다" 는 핵심 경험은 성립한다.
+    ///    오디오 실패 시 쉼 전체를 중단할지 여부는 아직 정해지지 않았다.
+    ///    자동으로 결정하지 않고 이 상태로 드러내기만 한다 — D-019.
+    @Published private(set) var audioError: String?
+
     // MARK: - 의존성
 
     private let timer: RestTimerService
+    private let audio: AudioService
+    private var audioTask: Task<Void, Never>?
 
-    init(timer: RestTimerService? = nil) {
+    init(timer: RestTimerService? = nil, audio: AudioService? = nil) {
         self.timer = timer ?? DefaultRestTimerService()
+        self.audio = audio ?? DefaultAudioService()
         bindTimer()
     }
 
@@ -86,6 +98,7 @@ final class RestFlowCoordinator: ObservableObject {
 
         state = .preparing
         errorMessage = nil
+        audioError = nil
         finishReason = nil
 
         do {
@@ -95,6 +108,7 @@ final class RestFlowCoordinator: ObservableObject {
             // 오디오·밝기·알림까지 함께 시작한다. 지금은 타이머만 붙인다.
             state = .running
             timer.start(duration: TimeInterval(validated.durationSeconds))
+            startAudio(mode: validated.plan.audio)
             path = [.session]
         } catch {
             state = .failed
@@ -115,6 +129,7 @@ final class RestFlowCoordinator: ObservableObject {
         guard state == .running else { return }
         state = .finishing
         timer.cancel()
+        stopAudio()
         finishReason = .completed
         state = .completed
         routeAfterFinish()
@@ -129,6 +144,7 @@ final class RestFlowCoordinator: ObservableObject {
         state = .finishing
         // 취소는 정상 완료와 다르다. 타이머의 onFinish 는 발생하지 않는다.
         timer.cancel()
+        stopAudio()
         finishReason = .cancelled
         state = .cancelled
         routeAfterFinish()
@@ -142,6 +158,7 @@ final class RestFlowCoordinator: ObservableObject {
         activePlan = nil
         finishReason = nil
         remainingSeconds = 0
+        audioError = nil
         state = .idle
     }
 
@@ -163,9 +180,47 @@ final class RestFlowCoordinator: ObservableObject {
     /// 오류 문구를 지운다.
     func clearError() {
         errorMessage = nil
+        audioError = nil
         if state == .failed {
             state = .idle
         }
+    }
+
+    // MARK: - 오디오
+
+    /// 쉼 시작과 함께 오디오를 튼다.
+    ///
+    /// 실패해도 쉼은 계속된다. 오류는 `audioError` 로만 드러낸다 (D-019).
+    private func startAudio(mode: AudioMode) {
+        audioTask?.cancel()
+        audioTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await self.audio.prepare(mode: mode)
+                guard !Task.isCancelled else { return }
+                try await self.audio.play()
+            } catch {
+                guard !Task.isCancelled else { return }
+                self.audioError = Self.audioMessage(for: error)
+            }
+        }
+    }
+
+    /// 오디오를 멈추고 정리한다.
+    ///
+    /// 정상 종료든 사용자 취소든 반드시 지나간다.
+    /// 아직 시작 중인 준비 작업도 취소해, 멈춘 뒤에 뒤늦게 소리가 나지 않게 한다.
+    private func stopAudio() {
+        audioTask?.cancel()
+        audioTask = nil
+        audio.stop()
+    }
+
+    private static func audioMessage(for error: Error) -> String {
+        if let audioError = error as? AudioServiceError {
+            return audioError.description
+        }
+        return "오디오를 재생하지 못했습니다."
     }
 
     // MARK: - 내부

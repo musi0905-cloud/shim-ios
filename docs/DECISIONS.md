@@ -701,3 +701,171 @@ RestSessionView → RestFlowCoordinator → RestTimerService → Clock / TickSch
 뷰는 `Timer` 도 `Date` 도 직접 다루지 않고 `scenePhase` 변화를 coordinator 에 전달만 한다.
 `scripts/verify_repo.py` 가 `Services/` 의 `SwiftUI`·`UIKit` import 를 차단해 이 방향을 강제한다.
 
+---
+
+## D-017. AudioService 경계와 interruption 대응
+
+- **Sprint**: 3
+- **상태**: 확정
+- **문제 구분**: B — 플랫폼 제약
+
+### 경계
+
+```
+RestPlan → ValidatedRestPlan → RestFlowCoordinator
+                                    ↓
+                               AudioService
+                                    ↓
+                        AVAudioSession / AVAudioPlayer
+```
+
+**SwiftUI View 는 AVFoundation 을 직접 호출하지 않는다.**
+`scripts/verify_repo.py` 가 계층별 import 를 검사해 이 방향을 강제한다.
+
+| 계층 | 금지 import |
+|---|---|
+| `Models/` `Engine/` | UIKit · SwiftUI · AVFoundation · UserNotifications |
+| `Services/` | UIKit · SwiftUI |
+| `Features/` | AVFoundation · UserNotifications |
+
+### 프로토콜
+
+```swift
+protocol AudioService: AnyObject {
+    var isPlaying: Bool { get }
+    func prepare(mode: AudioMode) async throws
+    func play() async throws
+    func stop()
+}
+```
+
+`pause()` 가 **없는 것은 의도적이다.**
+
+### Pause 의 두 가지 의미를 구분한다
+
+| 종류 | 허용 |
+|---|---|
+| **사용자 UX 의 Pause** | ❌ 금지. 쉼 시간을 사용자가 관리하게 하지 않는다 (D-014) |
+| **OS interruption 대응 내부 pause/resume** | ✅ 허용. 사용자에게 노출되지 않는다 |
+
+전화·Siri 가 들어오면 iOS 가 오디오를 끊는다. 그 뒤 처리가 필요하다.
+
+```
+재생 중 → 전화 수신 → iOS interruption → 오디오 중단
+       → 전화 종료 → 정책에 따라 재개
+```
+
+`DefaultAudioService` 내부 동작:
+
+| 이벤트 | 동작 |
+|---|---|
+| interruption began | `player.pause()`, `isPlaying = false`, 재개 대상으로 표시 |
+| interruption ended (`shouldResume`) | 원래 재생 중이었고 시스템이 권할 때만 다시 튼다 |
+| interruption ended (재개 불가) | 멈춘 채로 둔다 |
+| route `oldDeviceUnavailable` | 이어폰이 빠졌다. 멈춘다 — 스피커로 터져 나오면 안 된다 |
+| `stop()` 이후의 interruption ended | **되살아나지 않는다.** 끝난 쉼의 소리가 다시 나면 안 된다 |
+
+### AVAudioSession 정책 (PoC)
+
+```
+Category  .playback
+Mode      .default
+UIBackgroundModes  audio
+```
+
+`.playback` 이라야 앱이 background 로 가거나 화면이 잠겨도 재생이 이어진다.
+이것이 "휴대폰을 내려놓고 있어도 쉼은 계속된다" 의 전제다.
+
+`AudioResourceTests.testBackgroundAudioCapabilityIsDeclared` 가 앱 번들의
+`Info.plist` 에 `UIBackgroundModes = [audio]` 가 실제로 들어갔는지 CI 에서 확인한다.
+설정이 빠진 것을 실기기에서 발견하면 늦다.
+
+---
+
+## D-018. 테스트 음원은 프로젝트가 직접 생성한다
+
+- **Sprint**: 3
+- **상태**: 확정 (Product Owner 지시, 2026-08-25)
+- **문제 구분**: D
+
+### 결정
+
+> "인터넷에서 자연음을 다운로드해서 넣으면 라이선스 문제가 생길 수 있으니까
+> Sprint 3 에서는 프로젝트가 직접 생성한 테스트 음원을 쓰는 게 제일 깔끔해."
+
+`scripts/generate_test_audio.py` 가 만드는 합성 음원 하나만 쓴다.
+
+| 항목 | 값 |
+|---|---|
+| 파일 | `ios/Shim/Resources/Audio/test_ambient.wav` |
+| 길이 | 30초 |
+| 형식 | 모노 · 22.05 kHz · 16-bit PCM |
+| 크기 | 약 1.3 MB |
+| 내용 | 110/165/220/330 Hz 사인 부분음 + 아주 느린 음량 흔들림 |
+| 레벨 | 피크 약 −18 dBFS (낮은 볼륨) |
+
+**⚠️ 이것은 제품용 콘텐츠가 아니다.** 오디오 실행 파이프라인이 실제로
+성립하는지 검증하기 위한 합성 톤이다.
+
+### loop 이음매
+
+모든 부분음의 주파수를 30초 안에 **정수 번** 진동하도록 골랐다
+(110 Hz → 3300 회 등). 파일 끝과 처음이 위상까지 맞아 `numberOfLoops = -1`
+로 무한 반복해도 '툭' 하는 소리가 나지 않는다.
+생성 스크립트가 첫 샘플과 마지막 샘플의 차이를 출력해 확인시켜 준다 (측정값 174 / 32767 ≈ 0.5%).
+
+### PoC 단계의 한계
+
+소리가 나는 모드(`calm_acoustic`, `nature_sound`)가 **같은 파일**을 쓴다.
+모드별로 다른 음원을 고르는 것은 제품 사운드를 정한 뒤의 일이다.
+
+### 이후
+
+제품 음악과 Apple Music(MusicKit) 연동은 훨씬 뒤 Sprint 에서 결정한다.
+그때 이 테스트 음원은 교체되거나 개발 전용으로 남는다.
+
+---
+
+## D-019. 오디오 실패 시 쉼을 중단할지는 아직 정하지 않는다
+
+- **Sprint**: 3
+- **상태**: **제안 — Product Owner 결정 필요**
+- **문제 구분**: D
+
+### 배경
+
+Product Owner 지시 12:
+
+> "Audio 실패 시 Timer/쉼 전체를 중단할지 여부는 현재 자동으로 결정하지 말고
+> 오류 상태를 명시적으로 처리한다."
+
+### 현재 동작
+
+**오디오가 실패해도 쉼은 계속된다.** 타이머는 그대로 돌고 결과 화면까지 간다.
+실패 사실은 `RestFlowCoordinator.audioError` 로 드러내기만 한다.
+
+이 선택의 근거는 제품 기준서다 — 소리가 없어도 **"10분 동안 화면에서 벗어난다"**
+는 핵심 경험은 성립한다. 오디오는 환경을 돕는 요소이지 쉼 자체가 아니다.
+
+`RestFlowAudioIntegrationTests` 가 이 동작을 고정한다.
+오디오가 실패한 쉼도 정상적으로 완료되고 앱은 크래시하지 않는다.
+
+### Product Owner 결정 필요
+
+오디오 실패를 사용자에게 어떻게 보여줄지 아직 정하지 않았다.
+현재 `audioError` 는 저장만 되고 **화면에 표시하지 않는다.**
+RestSession 화면은 "남은 시간 + 한 문장 + 중단 버튼" 뿐이어야 하므로
+(IOS_SPEC §8.2) 오류 문구를 넣는 것 자체가 제품 원칙과 부딪힌다.
+
+- **1안 — 아무것도 보여주지 않는다 (현재)**
+  소리가 안 나는 것을 사용자가 알아차리지만 화면은 조용하다.
+  제품 철학에 가장 부합한다. 다만 사용자가 고장이라고 느낄 수 있다.
+- **2안 — 시작 시 한 줄만 조용히 알린다**
+  "소리 없이 진행합니다" 정도. 정보는 주되 화면을 복잡하게 만들지 않는다.
+- **3안 — 오디오가 핵심인 계획은 시작을 거부한다**
+  `audio` 가 `.silence` 가 아닌데 실패하면 쉼을 시작하지 않는다.
+  가장 정직하지만 "앱이 대신 해준다" 는 약속을 깨뜨린다.
+
+Sprint 3B(실기기 검증) 결과를 보고 결정하는 것을 권한다.
+실기기에서 오디오 실패가 얼마나 자주 일어나는지 알아야 판단할 수 있다.
+
