@@ -522,3 +522,63 @@ Product Owner 지시로 Sprint 1 에 앞당긴다.
 `RestPlanExecutor` 본체, Service 의존성 주입, 시작·종료·취소 오케스트레이션, 통합 테스트.
 Validator 는 Sprint 6 에서 Executor 가 호출하기만 하면 된다.
 
+---
+
+## D-013. CI 에서 `xcodebuild -version | head -1` 을 쓰지 않는다
+
+- **Sprint**: 1
+- **상태**: 확정 (2026-08-25)
+- **문제 구분**: C — 개발 환경 제약
+
+### 증상
+
+Sprint 1 첫 CI 실행([Run #3](https://github.com/musi0905-cloud/shim-ios/actions/runs/32794527216))이
+Swift 코드를 컴파일하기도 전에 4번 스텝에서 실패했다.
+
+```
+*** Terminating app due to uncaught exception 'NSFileHandleOperationException',
+    reason: '*** -[_NSStdIOFileHandle writeData:]: Broken pipe'
+    4  xcodebuild  -[XcodebuildPreIDEHandler handleVersionWithArguments:] + 616
+##[error]Process completed with exit code 134.
+```
+
+### 원인
+
+`xcodebuild -version` 은 두 줄을 출력한다.
+
+```
+Xcode 26.6
+Build version 17F113
+```
+
+`xcodebuild -version | head -1` 에서 `head` 는 첫 줄을 읽고 즉시 종료하며 파이프를 닫는다.
+`xcodebuild` 는 SIGPIPE 를 처리하지 않고 `NSFileHandle writeData:` 로 둘째 줄을 쓰다가
+**uncaught Objective-C 예외로 abort** 한다 (exit 134).
+`set -euo pipefail` 이 걸려 있어 스텝 전체가 실패한다.
+
+**타이밍 의존이다.** `xcodebuild` 가 두 줄을 모두 써넣고 종료한 뒤에 `head` 가 파이프를 닫으면
+아무 일도 일어나지 않는다. Run #1·#2 가 통과한 이유이고, Run #3 에서 처음 드러난 이유다.
+
+### 조치
+
+파이프로 자르지 않는다. 출력을 파일로 받은 뒤 `sed` 로 읽는다.
+
+```bash
+xcodebuild -version > "$LOG_DIR/xcodebuild-version.txt" 2>&1
+XCODE_FULL="$(sed -n '1p'  "$LOG_DIR/xcodebuild-version.txt")"
+XCODE_MAJOR="$(sed -n 's/^Xcode \([0-9]*\).*/\1/p' "$LOG_DIR/xcodebuild-version.txt")"
+```
+
+부수 효과로 버전 원본이 artifact 에 남아 진단이 쉬워진다.
+
+### 규칙
+
+**CI 에서 Apple 커맨드라인 도구의 출력을 `head` 로 자르지 않는다.**
+`xcodebuild` `xcrun` `simctl` 등은 SIGPIPE 를 처리하지 않을 수 있다.
+`tail` 은 입력을 끝까지 읽으므로 안전하다. 잘라야 하면 파일로 받은 뒤 `sed`/`awk` 를 쓴다.
+
+### 배운 것
+
+간헐적으로만 재현되는 실패라도 "flake" 로 넘기고 재실행하지 않는다.
+로그에 원인이 정확히 남아 있었고, 재실행했다면 통과했겠지만 다음 Sprint 에서 다시 터졌을 것이다.
+

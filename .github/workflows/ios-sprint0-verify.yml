@@ -86,15 +86,23 @@ jobs:
             fi
           fi
 
+          # xcodebuild -version 은 SIGPIPE 를 처리하지 않는다.
+          # `xcodebuild -version | head -1` 처럼 읽는 쪽이 파이프를 먼저 닫으면
+          # NSFileHandleOperationException(Broken pipe)으로 abort 하고 exit 134 를
+          # 낸다. 타이밍에 따라 터지는 결함이라 간헐적으로만 드러난다.
+          # 따라서 파이프로 자르지 않고 파일로 받은 뒤 sed 로 읽는다.
+          xcodebuild -version > "$LOG_DIR/xcodebuild-version.txt" 2>&1
+          swift --version    > "$LOG_DIR/swift-version.txt" 2>&1 || true
+
           {
             echo "macOS: $(sw_vers -productVersion) ($(sw_vers -buildVersion)) $(uname -m)"
-            xcodebuild -version
+            cat "$LOG_DIR/xcodebuild-version.txt"
             echo "xcode-select: $(xcode-select -p)"
-            swift --version 2>&1 | head -2 || true
+            sed -n '1,2p' "$LOG_DIR/swift-version.txt"
           } | tee "$LOG_DIR/xcode-version.txt"
 
-          XCODE_MAJOR="$(xcodebuild -version | sed -n 's/^Xcode \([0-9]*\).*/\1/p')"
-          XCODE_FULL="$(xcodebuild -version | head -1)"
+          XCODE_MAJOR="$(sed -n 's/^Xcode \([0-9]*\).*/\1/p' "$LOG_DIR/xcodebuild-version.txt")"
+          XCODE_FULL="$(sed -n '1p' "$LOG_DIR/xcodebuild-version.txt")"
           echo "xcode_major=${XCODE_MAJOR}" >> "$GITHUB_OUTPUT"
           echo "xcode_full=${XCODE_FULL}"   >> "$GITHUB_OUTPUT"
           echo "macos_version=$(sw_vers -productVersion)" >> "$GITHUB_OUTPUT"
