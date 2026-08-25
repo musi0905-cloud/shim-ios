@@ -13,6 +13,9 @@ import SwiftUI
 struct RootView: View {
     @StateObject private var coordinator = RestFlowCoordinator()
 
+    /// 앱 lifecycle 관찰. 시간 계산은 하지 않고 변화만 coordinator 에 전달한다.
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some View {
         NavigationStack(path: pathBinding) {
             HomeView()
@@ -26,6 +29,14 @@ struct RootView: View {
                 }
         }
         .environmentObject(coordinator)
+        .onChange(of: scenePhase) { _, newPhase in
+            // background 에서는 tick 이 돌지 않는다. 복귀 시 남은 시간을
+            // endsAt 기준으로 다시 계산한다. 이미 종료 시각이 지났다면
+            // 그 자리에서 쉼이 끝난다.
+            if newPhase == .active {
+                coordinator.handleReturnToForeground()
+            }
+        }
     }
 
     /// NavigationStack 은 쓰기 가능한 Binding 을 요구하지만, 경로 변경 권한은

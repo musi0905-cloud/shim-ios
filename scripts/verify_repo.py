@@ -442,12 +442,12 @@ def check_sprint_scope() -> None:
     """현재 Sprint 범위를 벗어난 파일이 생기지 않았는지 확인한다.
 
     운영규칙 §3 — "현재 Sprint 가 완료되기 전에 다음 Sprint 코드를 구현하지 않는다."
-    Sprint 1 지시 7 — AudioService / TimerService / BrightnessService /
-    NotificationService 는 생성하지 않는다.
+    Sprint 2 지시 10 — Audio / Brightness / Notification / OpenAI /
+    Location / Watch 는 이번 Sprint 에서 구현하지 않는다.
+    (TimerService 는 Sprint 2 에서 허용되어 목록에서 제외했다.)
     """
     out_of_scope = {
         "AudioService": "Sprint 3 (Audio PoC)",
-        "TimerService": "Sprint 2 (Timer Engine)",
         "BrightnessService": "Sprint 4 (Brightness)",
         "NotificationService": "Sprint 5 (Local Notification)",
         "RestPlanExecutor": "Sprint 6 (Executor 통합)",
@@ -474,11 +474,16 @@ def check_sprint_scope() -> None:
 
     # 도메인 계층이 iOS 시스템 프레임워크에 의존하지 않는지 확인한다.
     # docs/IOS_SPEC.md §4.1 — UI 는 시스템 API 를 직접 호출하지 않는다.
-    forbidden_imports = ("import UIKit", "import AVFoundation", "import UserNotifications")
+    forbidden_imports = (
+        "import UIKit",
+        "import SwiftUI",
+        "import AVFoundation",
+        "import UserNotifications",
+    )
     leaks = []
     for path in swift_files:
         rel_path = os.path.relpath(path, REPO)
-        if "/Models/" not in path and "/Engine/" not in path:
+        if not any(seg in path for seg in ("/Models/", "/Engine/", "/Services/")):
             continue
         content = read(path)
         for imp in forbidden_imports:
@@ -488,7 +493,7 @@ def check_sprint_scope() -> None:
         for leak in leaks:
             fail(f"Domain 계층이 시스템 프레임워크에 의존: {leak}")
     else:
-        ok("Domain 계층(Models/·Engine/)이 시스템 프레임워크에 의존하지 않음")
+        ok("Domain·Service 계층(Models/·Engine/·Services/)이 UI 프레임워크에 의존하지 않음")
 
 
 def check_gitignore() -> None:

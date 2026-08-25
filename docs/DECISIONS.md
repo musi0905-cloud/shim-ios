@@ -582,3 +582,122 @@ XCODE_MAJOR="$(sed -n 's/^Xcode \([0-9]*\).*/\1/p' "$LOG_DIR/xcodebuild-version.
 간헐적으로만 재현되는 실패라도 "flake" 로 넘기고 재실행하지 않는다.
 로그에 원인이 정확히 남아 있었고, 재실행했다면 통과했겠지만 다음 Sprint 에서 다시 터졌을 것이다.
 
+---
+
+## D-014. 쉼 타이머에 Pause / Resume 을 두지 않는다
+
+- **Sprint**: 2
+- **상태**: **확정** (Product Owner 지시, 2026-08-25)
+- **문제 구분**: D — 제품 결정 필요
+
+### 결정
+
+> "「쉼」의 철학은 사용자가 타이머를 관리하는 게 아니라 **'10분 동안 맡긴다'** 에 가까워.
+> Pause / Resume 을 넣으면 다시 사용자가 시간을 관리해야 해."
+
+허용되는 흐름은 두 가지뿐이다.
+
+```
+Start → Running → Automatic Finish
+Start → Running → User Cancel
+```
+
+### 코드에 고정한 방법
+
+`RestFlowCoordinator.finish()` 를 **`private`** 으로 뒀다.
+`RestTimerService` 가 시간 만료 시에만 호출한다.
+사용자가 "다 쉬었다"고 눌러 끝내는 경로를 타입 수준에서 없앤다.
+
+사용자에게 주는 출구는 `cancel()` 하나이고, 화면에는 **"쉼 그만하기"** 버튼 하나만 있다.
+이것은 정상 완료와 명확히 다른 `cancelled` 상태·`FinishReason.cancelled` 로 처리된다.
+
+`docs/IOS_SPEC.md` §7.1 의 "pause 가 필요한지 제품 기준에 맞춰 검토" 는 이 결정으로 닫힌다.
+
+---
+
+## D-015. 남은 시간은 `endsAt` 기준으로 계산한다. tick 을 누적하지 않는다
+
+- **Sprint**: 2
+- **상태**: 확정
+- **문제 구분**: B — 플랫폼 제약
+
+### 계산 규칙
+
+```
+startedAt + duration = endsAt
+remaining = max(0, endsAt - now)
+```
+
+`endsAt` 하나가 남은 시간의 source of truth 다.
+
+**tick 은 화면을 다시 그리라는 신호일 뿐이다.** tick 횟수를 세지 않는다.
+`RestTimerServiceTests.testTickCountDoesNotAffectRemaining` 이 이를 고정한다 —
+시계를 그대로 두고 tick 을 100번 발생시켜도 남은 시간은 변하지 않아야 한다.
+tick 누적 방식이었다면 이 테스트가 깨진다.
+
+### background 에 대한 입장
+
+**background 에서 매초 코드를 돌리려 하지 않는다.** iOS 가 앱을 suspend 할 수 있고,
+그것을 보장할 수도 없으며 그럴 필요도 없다.
+
+```
+10:00  시작, endsAt = 10:10
+10:03  background → iOS 가 suspend. tick 안 돎.
+10:08  foreground 복귀 → refresh()
+       remaining = 10:10 - 10:08 = 2분
+
+10:14 에 돌아왔다면
+       remaining = max(0, 10:10 - 10:14) = 0 → 즉시 종료 → RestResult
+```
+
+`DisplayTickScheduler` 는 `Task` 기반이라 앱이 suspend 되면 자연히 멈춘다. 의도된 동작이다.
+복귀 시 `RestFlowCoordinator.handleReturnToForeground()` 가 `refresh()` 를 불러 다시 계산한다.
+
+이 구조라야 "휴대폰을 내려놓고 있어도 쉼은 계속된다" 는 경험이 성립한다.
+
+### 이번 Sprint 의 범위 밖
+
+**앱 프로세스가 종료된 뒤의 복원은 구현하지 않는다.**
+`endsAt` 은 메모리에만 있다. 프로세스가 죽으면 세션도 사라진다.
+현재 범위는 **프로세스가 유지된 상태에서의 foreground/background 전환 정확성**이다.
+프로세스 종료를 넘는 session persistence 는 별도 요구사항으로 분리한다 — **B-007**.
+
+---
+
+## D-016. Clock 과 TickScheduler 를 주입한다
+
+- **Sprint**: 2
+- **상태**: 확정
+- **문제 구분**: C
+
+### 결정
+
+`DefaultRestTimerService(clock:scheduler:)` 로 둘 다 주입한다.
+
+| 프로토콜 | 운영 구현 | 테스트 구현 |
+|---|---|---|
+| `Clock` | `SystemClock` (`Date()`) | `MutableClock` — `advance(by:)` 로 시간을 앞당긴다 |
+| `TickScheduler` | `DisplayTickScheduler` (`Task` 루프) | `ManualTickScheduler` — `fire()` 를 부를 때만 tick |
+
+### 이렇게 한 이유
+
+실제 시간을 기다리지 않고 다음을 **결정적으로** 재현할 수 있다.
+
+시작 직후 / 1분 경과 / 종료 직전 / 종료 시점 / 종료 초과 / background 복귀.
+
+특히 **background 는 "tick 을 부르지 않는 것"으로 그대로 재현된다.**
+`ManualTickScheduler` 가 자동으로 돌지 않기 때문에, 시계만 앞당기고 `fire()` 를
+부르지 않으면 앱이 suspend 된 상황과 동일하다.
+
+10분짜리 쉼의 종료를 검증하는 데 10분이 걸리지 않는다. CI 에서 전체 타이머 테스트가 1초 안에 끝난다.
+
+### 의존 방향
+
+```
+RestSessionView → RestFlowCoordinator → RestTimerService → Clock / TickScheduler
+```
+
+`RestTimerService` 는 UI 를 알지 못한다. `Foundation` 만 import 한다.
+뷰는 `Timer` 도 `Date` 도 직접 다루지 않고 `scenePhase` 변화를 coordinator 에 전달만 한다.
+`scripts/verify_repo.py` 가 `Services/` 의 `SwiftUI`·`UIKit` import 를 차단해 이 방향을 강제한다.
+

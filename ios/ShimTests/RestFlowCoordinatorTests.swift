@@ -18,15 +18,32 @@ import XCTest
 final class RestFlowCoordinatorTests: XCTestCase {
 
     private var coordinator: RestFlowCoordinator!
+    private var clock: MutableClock!
+    private var scheduler: ManualTickScheduler!
 
     override func setUp() async throws {
         try await super.setUp()
-        coordinator = RestFlowCoordinator()
+        clock = MutableClock()
+        scheduler = ManualTickScheduler()
+        coordinator = RestFlowCoordinator(
+            timer: DefaultRestTimerService(clock: clock, scheduler: scheduler)
+        )
     }
 
     override func tearDown() async throws {
         coordinator = nil
+        scheduler = nil
+        clock = nil
         try await super.tearDown()
+    }
+
+    /// 쉼이 시간이 다 되어 자동 종료되게 한다.
+    ///
+    /// Sprint 2 부터 `finish()` 는 타이머만 호출한다. 사용자가 직접 부르는
+    /// 경로는 없으므로 테스트도 시간을 흘려보내 종료시킨다.
+    private func elapseUntilFinished() {
+        clock.advance(minutes: 60)
+        scheduler.fire()
     }
 
     // MARK: - 초기 상태
@@ -47,7 +64,7 @@ final class RestFlowCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.path, [.session])
         XCTAssertNotNil(coordinator.activePlan)
 
-        coordinator.finish()
+        elapseUntilFinished()
         XCTAssertEqual(coordinator.state, .completed)
         XCTAssertEqual(coordinator.path, [.session, .result])
         XCTAssertEqual(coordinator.finishReason, .completed)
@@ -85,7 +102,7 @@ final class RestFlowCoordinatorTests: XCTestCase {
         )
 
         coordinator.start(with: plan)
-        coordinator.finish()
+        elapseUntilFinished()
 
         XCTAssertTrue(coordinator.path.isEmpty, "결과 화면을 거치지 않아야 한다")
         XCTAssertEqual(coordinator.state, .idle)
@@ -108,7 +125,7 @@ final class RestFlowCoordinatorTests: XCTestCase {
 
     func testCanStartAgainAfterReturningHome() {
         coordinator.start(with: MockRestPlanFactory.defaultPlan())
-        coordinator.finish()
+        elapseUntilFinished()
         coordinator.returnHome()
 
         coordinator.start(with: MockRestPlanFactory.shortPlan(minutes: 2))
@@ -117,11 +134,8 @@ final class RestFlowCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.activePlan?.plan.durationMinutes, 2)
     }
 
-    /// 시작하지 않았는데 종료·취소를 호출해도 상태가 망가지지 않아야 한다.
-    func testFinishAndCancelAreNoOpsWhenIdle() {
-        coordinator.finish()
-        XCTAssertEqual(coordinator.state, .idle)
-
+    /// 시작하지 않았는데 취소를 호출해도 상태가 망가지지 않아야 한다.
+    func testCancelIsNoOpWhenIdle() {
         coordinator.cancel()
         XCTAssertEqual(coordinator.state, .idle)
         XCTAssertTrue(coordinator.path.isEmpty)

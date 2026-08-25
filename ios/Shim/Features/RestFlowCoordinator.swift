@@ -7,10 +7,14 @@
 //  운영규칙 §6 — "상태는 단일 소스에서 관리"
 //  docs/IOS_SPEC.md §9 — "상태 전이는 한 곳에서 관리한다."
 //
-//  Sprint 1 범위:
-//    화면 흐름과 상태 전이만 담당한다. 오디오·타이머·밝기·알림은 붙이지 않는다.
-//    이후 Sprint 에서 RestPlanExecutor 가 Service 들을 호출하게 되면
-//    이 타입은 Executor 를 호출하고 상태만 반영하는 역할로 남는다.
+//  현재 범위 (Sprint 2):
+//    화면 흐름, 상태 전이, 그리고 RestTimerService 연결까지 담당한다.
+//    오디오·밝기·알림은 아직 붙이지 않는다.
+//    Sprint 6 에서 RestPlanExecutor 가 Service 들을 묶으면 이 타입은
+//    Executor 를 호출하고 상태만 반영하는 역할로 남는다.
+//
+//  의존 방향:
+//      RestSessionView → RestFlowCoordinator → RestTimerService
 //
 //  이 타입은 SwiftUI 외의 iOS 시스템 프레임워크를 import 하지 않는다.
 //  덕분에 Simulator 에서 유닛 테스트로 흐름 전체를 검증할 수 있다.
@@ -43,6 +47,31 @@ final class RestFlowCoordinator: ObservableObject {
     /// 마지막으로 발생한 오류의 사용자 표시 문구. 없으면 `nil`.
     @Published private(set) var errorMessage: String?
 
+    /// 남은 시간(초). 화면 표시용이다.
+    ///
+    /// 이 값은 `RestTimerService` 가 `endsAt` 기준으로 계산해 밀어준다.
+    /// tick 횟수를 누적한 값이 아니다.
+    @Published private(set) var remainingSeconds: TimeInterval = 0
+
+    // MARK: - 의존성
+
+    private let timer: RestTimerService
+
+    init(timer: RestTimerService? = nil) {
+        self.timer = timer ?? DefaultRestTimerService()
+        bindTimer()
+    }
+
+    private func bindTimer() {
+        timer.onTick = { [weak self] remaining in
+            self?.remainingSeconds = remaining
+        }
+        // 시간이 다 되면 자동 종료된다. 사용자가 아무것도 하지 않아도 된다.
+        timer.onFinish = { [weak self] in
+            self?.finish()
+        }
+    }
+
     // MARK: - 흐름
 
     /// 쉼을 시작한다.
@@ -62,9 +91,10 @@ final class RestFlowCoordinator: ObservableObject {
         do {
             let validated = try RestPlanValidator.validate(plan)
             activePlan = validated
-            // Sprint 1 에는 준비할 시스템 자원이 없다. 바로 running 으로 간다.
-            // Sprint 6 에서 RestPlanExecutor.start(plan) 이 이 자리에 들어간다.
+            // Sprint 6 에서 RestPlanExecutor.start(plan) 이 이 자리에 들어가
+            // 오디오·밝기·알림까지 함께 시작한다. 지금은 타이머만 붙인다.
             state = .running
+            timer.start(duration: TimeInterval(validated.durationSeconds))
             path = [.session]
         } catch {
             state = .failed
@@ -74,9 +104,17 @@ final class RestFlowCoordinator: ObservableObject {
     }
 
     /// 쉼을 정상 종료한다.
-    func finish() {
+    ///
+    /// **시간이 다 되었을 때 `RestTimerService` 만 호출한다.**
+    /// `private` 인 것은 의도적이다. 사용자가 "다 쉬었다"고 눌러 끝내는 경로를
+    /// 타입 수준에서 없앤다. 사용자가 쓸 수 있는 출구는 `cancel()` 하나뿐이다.
+    ///
+    ///     Start → Running → Automatic Finish   ← 이 메서드
+    ///     Start → Running → User Cancel        ← cancel()
+    private func finish() {
         guard state == .running else { return }
         state = .finishing
+        timer.cancel()
         finishReason = .completed
         state = .completed
         routeAfterFinish()
@@ -89,6 +127,8 @@ final class RestFlowCoordinator: ObservableObject {
     func cancel() {
         guard state == .running else { return }
         state = .finishing
+        // 취소는 정상 완료와 다르다. 타이머의 onFinish 는 발생하지 않는다.
+        timer.cancel()
         finishReason = .cancelled
         state = .cancelled
         routeAfterFinish()
@@ -101,7 +141,23 @@ final class RestFlowCoordinator: ObservableObject {
         path = []
         activePlan = nil
         finishReason = nil
+        remainingSeconds = 0
         state = .idle
+    }
+
+    // MARK: - 앱 lifecycle
+
+    /// 앱이 foreground 로 돌아왔을 때 호출한다.
+    ///
+    /// background 에서는 tick 이 돌지 않는다. iOS 가 앱을 suspend 하기 때문이다.
+    /// 복귀 시 `endsAt` 기준으로 남은 시간을 다시 계산한다.
+    /// 이미 종료 시각이 지났다면 그 자리에서 종료 처리된다.
+    ///
+    /// 뷰는 `scenePhase` 변화를 이 메서드로 전달하기만 한다.
+    /// 시간 계산은 전부 `RestTimerService` 가 한다.
+    func handleReturnToForeground() {
+        guard state == .running else { return }
+        timer.refresh()
     }
 
     /// 오류 문구를 지운다.
