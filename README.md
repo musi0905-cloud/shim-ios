@@ -5,7 +5,7 @@
 >
 > 「쉼」은 **추천 앱이 아니라 실행 앱**이다. 사용자를 앱에 오래 붙잡지 않는다.
 
-**현재 상태: Sprint 3 — Audio PoC 🟡 IMPLEMENTED / DEVICE VERIFICATION BLOCKED**
+**현재 상태: Sprint 7 — Feedback & Local Personalization ✅ DONE (2026-08-25)**
 
 > 이 저장소는 `musi0905-cloud/App`에서 「쉼」 관련 파일만 분리해 만들었다 (`docs/DECISIONS.md` D-002).
 > 무관한 Google Apps Script 프로젝트는 `App` 저장소에 그대로 남아 있다.

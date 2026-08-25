@@ -230,7 +230,8 @@ CI 결과를 확인하지 않은 상태에서 빌드·테스트가 통과했다�
 | 3 — Audio PoC | 🟡 **IMPLEMENTED / DEVICE VERIFICATION BLOCKED** | Gate A: [Run #8](https://github.com/musi0905-cloud/shim-ios/actions/runs/32798630436) — 103 tests / Gate B: 환경 없음 |
 | 4 — Brightness | ⛔ BLOCKED | 실기기 필요 |
 | 5 — Notification | ⛔ BLOCKED | 실기기 필요 |
-| **7 — Feedback** | 🔜 **NEXT** | 계획 제시, 승인 대기 |
+| 7 — Feedback | ✅ DONE | [Run #10](https://github.com/musi0905-cloud/shim-ios/actions/runs/32822914330) — 139 tests |
+| **8 — Backend Skeleton** | 🔜 **NEXT** | 승인 대기 |
 
 **임시 Sprint 순서 (D-021)**: 7 → 8 → 9 → 10.
 Product Owner 가 Mac 을 보유하지 않아 실기기 검증이 불가능하다.

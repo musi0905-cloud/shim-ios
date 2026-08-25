@@ -17,8 +17,8 @@ Product Owner 가 Mac 을 보유하지 않아 실기기 검증을 수행할 수 
 **실기기 의존 Sprint 를 뒤로 미루고 CI 만으로 완결되는 Sprint 를 먼저 진행한다.**
 
 ```
-7 — Feedback / Local Preference   ← 다음
-8 — Backend Foundation
+7 — Feedback / Local Preference   ✅ DONE
+8 — Backend Foundation            ← 다음
 9 — AI Rest Director
 10 — AI UX
 ```
@@ -40,8 +40,8 @@ Sprint 3 Gate B · Sprint 4 Brightness · Sprint 5 Notification
 | 4 | Brightness & Minimal Screen | ⛔ **BLOCKED** — 실기기 필요 (D-021) |
 | 5 | Local Notification | ⛔ **BLOCKED** — 실기기 필요 (D-021) |
 | 6 | RestPlanExecutor 통합 | TODO |
-| 7 | Feedback & Local Personalization Base | 🔜 **NEXT** — 계획 제시, 승인 대기 (D-021) |
-| 8 | Backend Skeleton | TODO |
+| 7 | Feedback & Local Personalization Base | ✅ **DONE** (2026-08-25) — CI 통과 |
+| 8 | Backend Skeleton | 🔜 **NEXT** — Product Owner 승인 대기 |
 | 9 | OpenAI Rest Director | TODO |
 | 10 | Minimal AI UX | TODO |
 | 11 | Apple Watch PoC | TODO |
@@ -590,7 +590,7 @@ CI 의 macOS runner 도 Simulator 만 제공한다. **Simulator 는 실기기가
 
 ## Sprint 7 — Feedback & Local Personalization Base
 
-**상태: TODO**
+**상태: DONE** (2026-08-25)
 
 ### 목표
 쉼 후 한 번의 피드백을 저장해 개인화 기반을 만든다.
@@ -601,17 +601,90 @@ CI 의 macOS runner 도 Simulator 만 제공한다. **Simulator 는 실기기가
 - 피드백 저장 테스트
 - 개인정보 최소 저장 검토
 
-### Acceptance Criteria
-- 쉼 종료 후 세 가지 중 하나를 선택할 수 있다.
-- 선택 결과가 해당 RestPlan과 함께 로컬 저장된다.
-- 앱 재실행 후에도 기록이 유지된다.
-- 원본 자유입력 전체를 불필요하게 장기 저장하지 않는다.
+### Acceptance Criteria — 전부 충족 ✅
+
+| # | 기준 | 결과 |
+|---|---|---|
+| 1 | 쉼 종료 후 세 가지 중 하나를 선택할 수 있다 | ✅ `testEachFeedbackChoiceIsSaved` |
+| 2 | 선택 결과가 해당 RestPlan 과 함께 로컬 저장된다 | ✅ `testEntryIsLinkedToThePlan` |
+| 3 | 앱 재실행 후에도 기록이 유지된다 | ✅ `testNewStoreInstanceSeesPersistedEntries` — ⚠️ 아래 한계 참고 |
+| 4 | 원본 자유입력 전체를 불필요하게 장기 저장하지 않는다 | ✅ `testEncodedKeysAreExactlyTheAllowedSet` (D-022) |
+
+⚠️ **AC-3 의 검증 한계**: 유닛 테스트는 "같은 UserDefaults suite 를 읽는 **새 스토어
+인스턴스**가 기록을 본다" 까지 검증한다. **실제 프로세스 종료 후 재실행은 아니다.**
+UserDefaults 에 실제로 기록됐다는 강한 근거이지만 동일한 검증은 아니므로 그대로 적어 둔다.
+
+### Product Owner 추가 결정 이행
+
+| # | 요구 | 이행 |
+|---|---|---|
+| 1 | 완료 + `endCheckin == true` → 응답 선택 후 한 번 저장 | ✅ `pendingEntry` 로 보류 후 1회 저장 |
+| 2 | 완료 + `endCheckin == false` → 즉시 `completed + nil` | ✅ `testEndCheckinFalseSavesImmediatelyWithoutResultScreen` |
+| 3 | 취소 → 결과 화면 없이 즉시 `cancelled + nil` | ✅ `testCancelDoesNotGoToResultScreen` (D-023) |
+| 4 | `plannedDurationMinutes` + `actualDurationSeconds`, 음수 금지 | ✅ `testActualDurationNeverGoesNegative` |
+| 5 | 자유 텍스트 필드를 만들지 않는다 | ✅ 허용 키 11개를 테스트로 고정 |
+| 6 | 최근 50건 보관 | ✅ `testOldestEntriesAreDroppedBeyondLimit` |
+| 7 | 저장 실패·손상 데이터가 흐름을 막거나 crash 시키지 않는다 | ✅ 저장 실패 2종 + 손상 데이터 3종 |
+| 8 | 기록 조회 UI·통계·개인화 summary 미구현 | ✅ 만들지 않음 |
+
+### CI 검증 결과 기록
+
+**Run**: [#10](https://github.com/musi0905-cloud/shim-ios/actions/runs/32822914330) · conclusion `success`
+**Commit**: `d800efbdbebd1f69ecd78511ecf29d7ca80592e1`
+**환경**: macos-latest / macOS 26.5.2 (arm64) · Xcode 26.6 · iPhone Air (iOS 26.5) · XcodeGen 재생성
+**Artifact**: `sprint0-verify-logs-10` — 325개 파일, 282 KB
+
+```
+** BUILD SUCCEEDED **
+** TEST SUCCEEDED **   139 tests, 0 failures
+```
+
+| 테스트 파일 | 개수 |
+|---|---:|
+| `AudioServiceTests` (+ `AudioResourceTests`) | 28 |
+| `RestHistoryStoreTests` (+ `RestHistoryEntryTests`) | 20 |
+| `RestTimerServiceTests` | 17 |
+| `RestFlowFeedbackIntegrationTests` | 16 |
+| `RestPlanDecodingTests` / `RestPlanValidatorTests` | 12 / 12 |
+| `RestFlowAudioIntegrationTests` / `RestFlowCoordinatorTests` | 11 / 11 |
+| `RestFlowTimerIntegrationTests` | 10 |
+| `ShimSmokeTests` | 2 |
+| **합계** | **139** |
+
+### 파일 변경 기록
+
+`./scripts/sprint_files.sh a0cc480 d800efb` 산출값이다.
+범위는 구현 커밋까지이며 이 DONE 기록 커밋은 포함하지 않는다.
+
+| 구분 | 개수 |
+|---|---:|
+| 생성 | 5 |
+| 수정 | 9 |
+| 삭제 | 0 |
+
+**생성 (5)**: `Models/RestFeedback.swift` · `Models/RestHistoryEntry.swift` ·
+`Persistence/RestHistoryStore.swift` · `ShimTests/RestHistoryStoreTests.swift` ·
+`ShimTests/RestFlowFeedbackIntegrationTests.swift`
+
+**수정 (9)**: `RestFlowCoordinator` · `RestResultView` · `TestDoubles` ·
+기존 테스트 3종(취소 흐름 변경 반영) · `verify_repo.py` · `CLAUDE.md` · `docs/DECISIONS.md`
+
+### 이 Sprint 의 설계 결정
+
+- **D-022** 자유 텍스트를 담을 필드를 만들지 않는다. 허용 키 11개를 테스트로 고정
+- **D-023** 취소한 쉼은 결과 화면으로 보내지 않는다. 계획 시간과 실제 시간을 모두 남긴다
+
+### 기존 테스트 수정
+
+취소 흐름이 바뀌어 기존 테스트 3개를 함께 고쳤다.
+취소 후 곧바로 홈으로 가므로 `state` 는 `.idle` 이다.
+**취소였다는 사실은 저장된 기록의 `outcome` 이 증명하도록** 검증 방식을 바꿨다.
 
 ---
 
 ## Sprint 8 — Backend Skeleton
 
-**상태: TODO**
+**상태: READY** — Product Owner 승인 대기
 
 ### 목표
 OpenAI Key를 앱에 넣지 않는 서버 구조를 만든다.
