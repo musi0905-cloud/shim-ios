@@ -17,11 +17,15 @@ Product Owner 가 Mac 을 보유하지 않아 실기기 검증을 수행할 수 
 **실기기 의존 Sprint 를 뒤로 미루고 CI 만으로 완결되는 Sprint 를 먼저 진행한다.**
 
 ```
-7 — Feedback / Local Preference   ✅ DONE
-8 — Backend Foundation            ← 다음
-9 — AI Rest Director
-10 — AI UX
+7   — Feedback / Local Preference   ✅ DONE
+7.5 — TestFlight Delivery PoC       ← 현재 (Gate A 완료, PO 결정 대기)
+8   — Backend Foundation
+9   — AI Rest Director
+10  — AI UX
 ```
+
+> Sprint 7.5 가 성공하면 막혀 있는 **Sprint 3 Gate B → 4 → 5** 를
+> 다시 실기기 기준으로 진행할 수 있다.
 
 ⛔ **BLOCKED backlog** — 실기기 환경 확보 전까지 진행하지 않는다
 Sprint 3 Gate B · Sprint 4 Brightness · Sprint 5 Notification
@@ -41,7 +45,8 @@ Sprint 3 Gate B · Sprint 4 Brightness · Sprint 5 Notification
 | 5 | Local Notification | ⛔ **BLOCKED** — 실기기 필요 (D-021) |
 | 6 | RestPlanExecutor 통합 | TODO |
 | 7 | Feedback & Local Personalization Base | ✅ **DONE** (2026-08-25) — CI 통과 |
-| 8 | Backend Skeleton | 🔜 **NEXT** — Product Owner 승인 대기 |
+| 7.5 | **TestFlight Delivery PoC** | 🟡 **DESIGNED / AWAITING PO DECISION** — Gate A 완료 (D-024) |
+| 8 | Backend Skeleton | TODO — 7.5 이후 |
 | 9 | OpenAI Rest Director | TODO |
 | 10 | Minimal AI UX | TODO |
 | 11 | Apple Watch PoC | TODO |
@@ -682,6 +687,70 @@ UserDefaults 에 실제로 기록됐다는 강한 근거이지만 동일한 검�
 
 ---
 
+## Sprint 7.5 — TestFlight Delivery PoC
+
+**상태: DESIGNED / AWAITING PO DECISION** (2026-08-25)
+
+### 목표
+
+기능 개발이 아니다.
+`GitHub → cloud macOS build → signing/archive → App Store Connect → TestFlight → PO iPhone`
+경로가 실제로 가능한지 검증한다.
+
+성공하면 막혀 있는 **Sprint 3 Gate B · Sprint 4 · Sprint 5** 가 한 번에 풀린다.
+
+### Gate A — 조사·설계 (비용 없음) ✅ 완료
+
+전체 결과는 **`docs/TESTFLIGHT_DELIVERY.md`** 참고.
+
+| # | 기준 | 결과 |
+|---|---|---|
+| A-1 | 필요한 Apple 계정·권한·식별자 정리 | ✅ |
+| A-2 | Bundle Identifier 검토·선택지 제시 | ✅ **PO 결정 대기** |
+| A-3 | 비밀정보 미커밋 구조 설계 | ✅ GitHub Secrets 5건 |
+| A-4 | App Store Connect 앱 레코드 필요 값 문서화 | ✅ |
+| A-5 | GitHub Actions archive/upload 가능성 검토 | ✅ 가능 |
+| A-6 | GitHub Actions vs Xcode Cloud 비교 | ✅ |
+| A-7 | Mac 없이 관리하기 쉬운 쪽 추천 | ✅ **GitHub Actions** (D-024) |
+| A-8 | 가입·결제·Apple 계정 변경 미수행 | ✅ |
+| A-9 | 앱 기능 변경 없음 | ✅ 코드 변경 0 |
+| A-10 | 예상 비용·blocker 정리 | ✅ |
+
+### 조사의 핵심 발견
+
+Apple 공식 요구사항 문서가 Xcode Cloud 에 **Xcode 15.0 이상**을 명시한다.
+Xcode 는 macOS 전용이므로 **Mac 없는 PO 에게는 Xcode Cloud 온보딩 자체가 막힐 수 있다.**
+
+"Mac 이 없어 막혔다" 는 문제를 풀려는 수단이 Mac 을 요구하는 구조다.
+따라서 Product Owner 의 초기 추천과 달리 **GitHub Actions 를 추천한다** (D-024).
+
+### Gate B — 실제 배포 (PO 승인·결제 후)
+
+| # | 기준 |
+|---|---|
+| B-1 | Apple Developer Program 가입 완료 |
+| B-2 | App Store Connect 앱 레코드 생성 완료 |
+| B-3 | CI 가 archive·서명·업로드에 성공한다 |
+| B-4 | 빌드가 TestFlight 에 나타난다 |
+| B-5 | **PO 의 iPhone 에 설치되어 실행된다** |
+| B-6 | 저장소에 비밀정보가 커밋되지 않았음을 확인한다 |
+
+### PO 결정 필요
+
+| # | 결정 | 추천 |
+|---|---|---|
+| 1 | Apple Developer Program 가입 (US$99/년) | 없으면 경로 전체가 불가능 |
+| 2 | Bundle ID | `com.musi0905.shim` |
+| 3 | App Name (유일해야 함) | `쉼 - 나를 위한 시간` 등 |
+| 4 | 배포 경로 | GitHub Actions |
+
+### 예상 최대 blocker
+
+서명 설정 오류. **첫 시도에 거의 반드시 한 번은 실패한다.**
+Sprint 3 의 `UIBackgroundModes` 처럼 CI 로그를 보고 고치는 과정이 필요하다.
+
+---
+
 ## Sprint 8 — Backend Skeleton
 
 **상태: READY** — Product Owner 승인 대기
@@ -836,5 +905,5 @@ OpenAI Key를 앱에 넣지 않는 서버 구조를 만든다.
 | B-007 | 앱 프로세스 종료 후 쉼 세션 복원 (session persistence) | Sprint 2 | 대기 — Sprint 2 범위 밖으로 분리 (D-015) |
 | B-008 | CI artifact 크기 — 테스트 실패 시 `.xcresult` 로 55MB 까지 커진다 | Sprint 3 | 대기 — 동작엔 지장 없음 |
 | B-009 | Rest Engine 의 audio failure fallback — SILENCE 또는 다른 Rest Block 으로 교체 | Sprint 3 | 대기 — Rest Engine Sprint 에서 (D-019) |
-| B-010 | TestFlight 배포 — Mac 없이 iPhone 설치 경로 확보. Gate B·Sprint 4·5 를 한 번에 푼다 | Sprint 3 | **PO 결정 필요** — Apple Developer Program 연 $99 (D-021) |
+| B-010 | TestFlight 배포 — Mac 없이 iPhone 설치 경로 확보 | Sprint 3 | ⬆️ **Sprint 7.5 로 승격** — 조사·설계 완료 (D-024) |
 | B-004 | 저장소 라이선스 결정 | Sprint 0 | 대기 — Product Owner 결정 필요 |

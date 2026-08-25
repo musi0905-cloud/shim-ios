@@ -32,6 +32,7 @@ Google Drive 문서가 **최상위 제품 기준**이고, 이 저장소의 문�
 | [`docs/SPRINTS.md`](docs/SPRINTS.md) | 04_쉼 Sprint Backlog v0.1 | Sprint 0~13 계획 및 상태 |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | — | 확정된 기술 결정 기록 (D-001~D-020) |
 | [`docs/DEVICE_VERIFICATION.md`](docs/DEVICE_VERIFICATION.md) | — | 실기기 검증 절차와 체크리스트 |
+| [`docs/TESTFLIGHT_DELIVERY.md`](docs/TESTFLIGHT_DELIVERY.md) | — | TestFlight 배포 경로 조사·설계 (Sprint 7.5) |
 
 **문서 간 충돌 시 우선순위**: 제품 기준서 > iOS 개발 명세서 > 운영규칙 > Sprint Backlog
 

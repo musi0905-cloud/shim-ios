@@ -1107,3 +1107,65 @@ let actualDurationSeconds: Int
 `docs/PRODUCT.md` §14 의 성공 지표 **쉼 완료율** 이 이 데이터를 필요로 한다.
 완료만 저장하면 완료율을 계산할 수 없다.
 
+---
+
+## D-024. TestFlight 배포 경로는 GitHub Actions 를 우선한다 (조사 결과)
+
+- **Sprint**: 7.5
+- **상태**: **제안 — Product Owner 결정 필요**
+- **문제 구분**: C — 개발 환경 제약
+
+### 배경
+
+Product Owner 는 Mac 이 없다 (D-021). 실기기 검증이 필요한 Sprint 3 Gate B ·
+4 · 5 가 모두 막혀 있다. TestFlight 로 iPhone 에 설치할 수 있으면 한 번에 풀린다.
+
+Product Owner 는 **Xcode Cloud** 를 우선 검토하도록 제안했다.
+Apple 공식 스택 안에서 Archive→TestFlight 가 이어지고 서명 자동화 부담이 적다는 이유다.
+
+### 조사 결과 — 추천이 뒤집혔다
+
+Apple 공식 요구사항 문서(*Setting up your project to use Xcode Cloud*)는
+**Xcode 15.0 이상**과 Apple Developer Program 멤버십을 요구조건으로 명시한다.
+
+**Xcode 는 macOS 전용이다.** 따라서 Xcode Cloud 온보딩에 Mac 이 필요할 가능성이 높다.
+"Mac 이 없어 막혔다" 는 문제를 풀려는 수단이 Mac 을 요구하는 구조다.
+
+반면 GitHub Actions 는 **Mac 이 필요한 모든 작업을 macOS runner 가 대신한다.**
+PO 는 브라우저만 있으면 된다. 인증서도 OpenSSL 로 CSR 을 만들어 웹에서 발급받을 수 있다.
+
+### 결정 (제안)
+
+**GitHub Actions 경로를 우선한다.**
+
+| 근거 | 내용 |
+|---|---|
+| 확실성 | Xcode Cloud 는 Xcode 를 요구조건에 명시한다. GitHub Actions 는 Mac 의존이 없다 |
+| 검증된 기반 | 이 저장소의 CI 가 macOS runner 에서 10회 성공했다. archive·upload 만 얹으면 된다 |
+| 재현성 | 전 과정이 저장소 YAML 로 남는다. Xcode Cloud 설정은 Apple 서버에만 있다 |
+
+**Product Owner 지적이 옳은 부분**: 인증서·프로파일·Secrets 관리를 직접 설계해야 하는
+운영 부담은 실재한다. 다만 일회성 설정이고, 그 대가로 Mac 의존이 사라진다.
+
+### Xcode Cloud 를 배제하지는 않는다
+
+가입 후 App Store Connect 웹에서 **Xcode 없이 워크플로를 만들 수 있는지** 확인한다.
+가능하다면 다시 비교할 가치가 있다. 확인 비용은 0 이다.
+
+### 함께 결정해야 할 것
+
+| # | 항목 | 추천 |
+|---|---|---|
+| 1 | Apple Developer Program 가입 (US$99/년) | 없으면 이 경로 전체가 불가능 |
+| 2 | Bundle ID — 현재 `com.shimapp.Shim` 은 도메인 미보유·충돌 위험 | `com.musi0905.shim` |
+| 3 | App Name — App Store Connect 전체에서 유일해야 한다 | `쉼 - 나를 위한 시간` 등 |
+| 4 | 저장소 public 전환 (Actions 무료 분 확보) | 무료 분이 부족할 때만 |
+
+전체 조사·설계는 `docs/TESTFLIGHT_DELIVERY.md` 참고.
+
+### 이 결정의 검증 방식
+
+Sprint 3 과 같이 두 Gate 로 나눈다.
+**Gate A(조사·설계, 비용 0)** 는 완료했다.
+**Gate B(실제 배포)** 는 PO 승인·결제 후에만 진행한다.
+
