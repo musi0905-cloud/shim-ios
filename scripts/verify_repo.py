@@ -514,6 +514,23 @@ def check_sprint_scope() -> None:
     else:
         ok(f"계층별 import 경계 준수 (검사 {checked}개 파일)")
 
+    # D-019 규칙 3 — 사용자에게 기술 오류 메시지를 크게 노출하지 않는다.
+    #
+    # audioError 는 진단용 상태다. AudioServiceError.description 은
+    # "음원 'test_ambient' 을 찾을 수 없습니다" 같은 기술적 문장이라
+    # 화면에 그대로 그리면 안 된다. RestSession 화면은 남은 시간과 한 문장,
+    # 중단 버튼뿐이어야 한다 (docs/IOS_SPEC.md §8.2).
+    exposed = [
+        os.path.relpath(path, REPO)
+        for path in swift_files
+        if path.endswith("View.swift") and "audioError" in read(path)
+    ]
+    if exposed:
+        for path in exposed:
+            fail(f"View 가 audioError 를 노출한다 (D-019 규칙 3): {path}")
+    else:
+        ok("audioError 가 어떤 View 에도 노출되지 않음 (D-019 규칙 3)")
+
 
 def check_gitignore() -> None:
     text = read(rel(".gitignore"))

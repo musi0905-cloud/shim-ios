@@ -500,7 +500,7 @@ CI 의 macOS runner 도 Simulator 만 제공한다. **Simulator 는 실기기가
 
 - **D-017** AudioService 경계. 사용자 Pause 금지 / OS interruption 내부 pause 허용
 - **D-018** 테스트 음원은 프로젝트가 직접 생성한다. 제품용 콘텐츠 아님
-- **D-019** 오디오 실패 시 쉼 중단 여부 — **PO 결정 대기**
+- **D-019** 오디오 실패는 쉼을 중단시키지 않는다 — **확정**. 장기 fallback 은 B-009
 - **D-020** Background Audio 는 실제 Info.plist 로 선언한다
 
 ---
@@ -744,4 +744,5 @@ OpenAI Key를 앱에 넣지 않는 서버 구조를 만든다.
 | B-006 | Xcode 26.6 / iOS 26 SDK 기준 재검토 — 배포 타깃·Swift 언어 모드(D-003, D-005) | Sprint 0 | 대기 — runner 실제 환경 확인 후 |
 | B-007 | 앱 프로세스 종료 후 쉼 세션 복원 (session persistence) | Sprint 2 | 대기 — Sprint 2 범위 밖으로 분리 (D-015) |
 | B-008 | CI artifact 크기 — 테스트 실패 시 `.xcresult` 로 55MB 까지 커진다 | Sprint 3 | 대기 — 동작엔 지장 없음 |
+| B-009 | Rest Engine 의 audio failure fallback — SILENCE 또는 다른 Rest Block 으로 교체 | Sprint 3 | 대기 — Rest Engine Sprint 에서 (D-019) |
 | B-004 | 저장소 라이선스 결정 | Sprint 0 | 대기 — Product Owner 결정 필요 |

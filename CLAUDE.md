@@ -231,6 +231,17 @@ CI 결과를 확인하지 않은 상태에서 빌드·테스트가 통과했다�
 
 **다음 Sprint 는 Product Owner 승인 후 시작한다.** (운영규칙 §3)
 
+### 오디오 실패는 쉼을 중단시키지 않는다 (D-019 확정)
+
+- Timer 와 Rest Session 은 계속 진행한다. 음악 파일 하나가 실패했다고
+  이미 시작한 10분 쉼을 끝내버리는 것이 제품 경험상 더 나쁘다.
+- 오류는 `audioError` 에 **기록만** 한다.
+- **사용자에게 기술 오류 메시지를 크게 노출하지 않는다.**
+  `audioError` 는 진단용이지 화면에 그릴 문구가 아니다.
+  `scripts/verify_repo.py` 가 View 파일의 `audioError` 참조를 차단한다.
+- 자동 대체 오디오는 **구현하지 않는다.** 향후 Rest Engine 이 audio failure 시
+  SILENCE 나 다른 Rest Block 으로 fallback 하는 구조를 고려한다 (B-009).
+
 ### 실기기 검증은 CI 로 대체할 수 없다
 
 **Simulator 는 실기기가 아니다.** 다음은 반드시 iPhone 에서 확인해야 한다.
