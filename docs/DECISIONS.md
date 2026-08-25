@@ -869,3 +869,64 @@ RestSession 화면은 "남은 시간 + 한 문장 + 중단 버튼" 뿐이어야 
 Sprint 3B(실기기 검증) 결과를 보고 결정하는 것을 권한다.
 실기기에서 오디오 실패가 얼마나 자주 일어나는지 알아야 판단할 수 있다.
 
+---
+
+## D-020. Background Audio 는 `INFOPLIST_KEY_` 가 아니라 실제 Info.plist 로 선언한다
+
+- **Sprint**: 3
+- **상태**: 확정 (2026-08-25)
+- **문제 구분**: C — 개발 환경 제약
+
+### 증상
+
+Sprint 3 Gate A 첫 CI([Run #7](https://github.com/musi0905-cloud/shim-ios/actions/runs/32798165809))에서
+**103개 중 정확히 1개**가 실패했다.
+
+```
+Failing tests:
+	AudioResourceTests.testBackgroundAudioCapabilityIsDeclared()
+Executed 103 tests, with 1 failure (0 unexpected)
+```
+
+빌드는 성공했고 나머지 102개는 통과했다.
+
+### 원인
+
+빌드 설정에 다음을 넣었지만 생성된 `Info.plist` 에 반영되지 않았다.
+
+```
+INFOPLIST_KEY_UIBackgroundModes = audio
+```
+
+`GENERATE_INFOPLIST_FILE` 이 지원하는 `INFOPLIST_KEY_*` 목록에
+`UIBackgroundModes` 가 포함되지 않는다. **오류도 경고도 없이 조용히 무시된다.**
+
+### 왜 위험했나
+
+`UIBackgroundModes` 에 `audio` 가 없으면 앱이 background 로 가는 순간 오디오가 끊긴다.
+Sprint 3 의 핵심 검증 항목 — "홈 화면으로 나가도 계속 재생" — 이 성립하지 않는다.
+
+빌드도 되고 Simulator foreground 재생도 되므로 **실기기 Gate B 에 가서야 드러났을 문제**다.
+번들의 `Info.plist` 를 직접 읽는 테스트를 CI 에 넣어둔 덕분에 코드 단계에서 잡혔다.
+
+### 조치
+
+`ios/Shim-Info.plist` 를 만들어 `INFOPLIST_FILE` 로 지정한다.
+
+```
+GENERATE_INFOPLIST_FILE = YES
+INFOPLIST_FILE = Shim-Info.plist
+```
+
+둘이 함께 있으면 Xcode 는 지정한 파일을 **바탕으로 삼고** `INFOPLIST_KEY_*` 값들을
+그 위에 병합한다. 따라서 이 파일에는 `UIBackgroundModes` 만 적고 나머지 키는 중복하지 않는다.
+
+파일을 동기화 소스 폴더(`ios/Shim/`) **밖**에 둔 것도 의도적이다.
+안에 두면 리소스로도 복사되어 번들에 `Info.plist` 가 중복될 수 있다.
+
+### 규칙
+
+**빌드 설정으로 선언한 capability 는 "설정했으니 됐다" 고 믿지 않는다.**
+번들 산출물을 직접 확인하는 테스트를 함께 둔다.
+설정이 조용히 무시되는 경우가 실제로 있다.
+

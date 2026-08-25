@@ -625,4 +625,5 @@ OpenAI Key를 앱에 넣지 않는 서버 구조를 만든다.
 | B-005 | CI actions 버전 상향 (`checkout@v4`/`upload-artifact@v4` → Node 20 deprecation 경고) | Sprint 0 | 대기 — 경고이며 실패 아님 |
 | B-006 | Xcode 26.6 / iOS 26 SDK 기준 재검토 — 배포 타깃·Swift 언어 모드(D-003, D-005) | Sprint 0 | 대기 — runner 실제 환경 확인 후 |
 | B-007 | 앱 프로세스 종료 후 쉼 세션 복원 (session persistence) | Sprint 2 | 대기 — Sprint 2 범위 밖으로 분리 (D-015) |
+| B-008 | CI artifact 크기 — 테스트 실패 시 `.xcresult` 로 55MB 까지 커진다 | Sprint 3 | 대기 — 동작엔 지장 없음 |
 | B-004 | 저장소 라이선스 결정 | Sprint 0 | 대기 — Product Owner 결정 필요 |

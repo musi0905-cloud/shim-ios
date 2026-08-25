@@ -50,10 +50,11 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
-        # Background Audio (Sprint 3, D-017).
-        # .playback 세션과 함께 있어야 앱이 background 로 가거나 화면이
-        # 잠겨도 재생이 이어진다. 실제 동작은 실기기에서만 검증 가능하다.
-        INFOPLIST_KEY_UIBackgroundModes: audio
+        # Background Audio (Sprint 3, D-017 / D-020).
+        # INFOPLIST_KEY_UIBackgroundModes 는 생성된 Info.plist 에 반영되지
+        # 않았다. 실제 plist 파일을 바탕으로 삼고 나머지 키는 그대로 병합한다.
+        # 동기화 소스 폴더(Shim/) 밖에 둬야 리소스로 중복 복사되지 않는다.
+        INFOPLIST_FILE: Shim-Info.plist
 
   ShimTests:
     type: bundle.unit-test
