@@ -105,6 +105,20 @@ Executed 2 tests, with 0 failures (0 unexpected) in 0.005 seconds
 - `DEVELOPMENT_TEAM`을 빈 값으로 커밋해도 Simulator 빌드·테스트에 지장이 없다 (D-004).
 - 배포 타깃 iOS 17.0(D-003)은 runner의 iOS 26.5 Simulator에서 정상 동작한다.
 
+### 파일 변경 기록
+
+`./scripts/sprint_files.sh EMPTY ab37c17` 산출값이다. 손으로 세지 않는다.
+
+| 구분 | 개수 |
+|---|---:|
+| 생성 | 20 |
+| 수정 | 0 |
+| 삭제 | 0 |
+
+저장소를 새로 만들었으므로 전부 생성이다.
+초기 이전 18개(D-002) + CI 워크플로 2개(`.github/workflows/ios-sprint0-verify.yml`,
+`scripts/ci/select_simulator.py`).
+
 ### 완료된 후속 작업
 
 - ✅ **저장소 분리** — `musi0905-cloud/shim-ios`로 이전 완료 (2026-08-25, D-002)
@@ -161,6 +175,50 @@ Executed 2 tests, with 0 failures (0 unexpected) in 0.005 seconds
 Sprint 1 코드를 처음 push 했을 때 CI 가 Swift 컴파일 전에 실패했다.
 원인은 **워크플로의 `xcodebuild -version | head -1`** 이 일으킨 SIGPIPE abort 로,
 Sprint 1 코드와 무관했다. 재실행으로 넘기지 않고 원인을 고쳤다 — **D-013**.
+
+### 파일 변경 기록
+
+`./scripts/sprint_files.sh ab37c17 8b79df7` 산출값이다. 손으로 세지 않는다.
+
+| 구분 | 개수 |
+|---|---:|
+| 생성 | 12 |
+| 수정 | 7 |
+| 삭제 | 0 |
+
+**생성 (12)**
+
+| 파일 | 역할 |
+|---|---|
+| `ios/Shim/Models/RestPlan.swift` | API 계약 |
+| `ios/Shim/Models/RestPlanEnums.swift` | 계약 어휘 |
+| `ios/Shim/Models/RestSessionState.swift` | 세션 상태 |
+| `ios/Shim/Models/MockRestPlanFactory.swift` | Mock 계획 |
+| `ios/Shim/Engine/RestPlanValidator.swift` | 검증 관문 |
+| `ios/Shim/Features/RestFlowCoordinator.swift` | 흐름·상태 단일 소스 |
+| `ios/Shim/Features/Home/HomeView.swift` | 홈 |
+| `ios/Shim/Features/RestSession/RestSessionView.swift` | 쉼 진행 |
+| `ios/Shim/Features/RestResult/RestResultView.swift` | 결과 |
+| `ios/ShimTests/RestPlanDecodingTests.swift` | 테스트 12 |
+| `ios/ShimTests/RestPlanValidatorTests.swift` | 테스트 12 |
+| `ios/ShimTests/RestFlowCoordinatorTests.swift` | 테스트 11 |
+
+**수정 (7)**
+
+| 파일 | 이유 |
+|---|---|
+| `ios/Shim/RootView.swift` | NavigationStack 연결 |
+| `scripts/verify_repo.py` | Sprint 범위 가드 추가 |
+| `.github/workflows/ios-sprint0-verify.yml` | D-013 SIGPIPE 수정 |
+| `docs/DECISIONS.md` | D-010~D-013 |
+| `docs/SPRINTS.md` | Sprint 1 기록 |
+| `README.md` | 상태 갱신 |
+| `CLAUDE.md` | 상태·계약 기록 |
+
+> **기록 정정 (2026-08-25)**: Sprint 1 완료 보고에서 생성 14 / 수정 5 로 적었으나
+> 실제 git diff 는 생성 12 / 수정 7 이다. 나열한 파일 목록 자체는 정확했고 합계만 틀렸다.
+> 재발을 막기 위해 `scripts/sprint_files.sh` 를 추가했다. 이후 모든 Sprint 의 파일 수치는
+> 이 스크립트 출력을 그대로 옮긴다. 코드 변경은 없다.
 
 ### 이 Sprint 의 설계 결정
 

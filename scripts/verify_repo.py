@@ -80,6 +80,7 @@ def check_required_files() -> None:
         "ios/ShimTests/ShimSmokeTests.swift",
         "scripts/mac_verify.sh",
         "scripts/ci/select_simulator.py",
+        "scripts/sprint_files.sh",
         ".github/workflows/ios-sprint0-verify.yml",
     ]
     missing = [p for p in required if not os.path.exists(rel(p))]
