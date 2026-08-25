@@ -220,20 +220,30 @@ Swift 코드와 Xcode 프로젝트는 작성 가능하지만, **"빌드 성공"�
 빌드·테스트 검증은 **GitHub Actions macOS runner** 에서 수행한다. (D-001, D-008)
 CI 결과를 확인하지 않은 상태에서 빌드·테스트가 통과했다고 보고하지 않는다.
 
-### Sprint 0 상태 — BLOCKED
+### Sprint 0 상태 — DONE (2026-08-25)
 
-Sprint 0은 아래 3개가 Mac에서 확인되기 전까지 **DONE이 아니다.** (D-009)
+CI가 Acceptance Criteria 6개를 모두 충족했다.
 
-| AC | 항목 |
-|---|---|
-| AC-1 | Xcode에서 프로젝트 열기 |
-| AC-2 | iOS Simulator 대상 build 성공 |
-| AC-6 | Unit Test 성공 |
+| AC | 항목 | 결과 |
+|---|---|---|
+| AC-1 | Xcode에서 프로젝트 열기 | ✅ |
+| AC-2 | iOS Simulator 대상 build | ✅ `** BUILD SUCCEEDED **` |
+| AC-3 | 저장소에 비밀정보 없음 | ✅ |
+| AC-4 | CLAUDE.md 운영규칙 포함 | ✅ |
+| AC-5 | README에 구조·빌드 방법 기록 | ✅ |
+| AC-6 | Unit Test 성공 | ✅ `** TEST SUCCEEDED **` (2/2) |
 
-검증 방법: **GitHub Actions macOS CI** — `.github/workflows/ios-sprint0-verify.yml` (D-008)
-Mac을 쓸 수 있으면 `./scripts/mac_verify.sh` 로 동일 항목을 로컬 검증할 수도 있다.
+검증: [Run #1](https://github.com/musi0905-cloud/shim-ios/actions/runs/32792825752) — Xcode 26.6 / iPhone Air (iOS 26.5)
+상세 기록은 `docs/SPRINTS.md`「CI 검증 결과 기록」.
 
-**Sprint 1은 위 3개가 성공하기 전까지 시작하지 않는다.** (Product Owner 결정, 2026-08-24)
+**Sprint 1은 Product Owner 승인 후 시작한다.** (운영규칙 §3)
+
+### 이후 Sprint의 검증 방식
+
+- 빌드·유닛 테스트: **CI** (`.github/workflows/ios-sprint0-verify.yml`)
+- 이 세션에서는 여전히 빌드할 수 없다. **CI 결과를 확인하기 전에 빌드·테스트 통과를 보고하지 않는다.**
+- **실기기 검증은 CI로 대체할 수 없다.** Simulator는 실기기가 아니다.
+  Sprint 3(Audio)·Sprint 5(Notification)은 실기기 검증 없이 DONE 처리하지 않는다.
 
 ### 프로젝트 정의의 기준
 

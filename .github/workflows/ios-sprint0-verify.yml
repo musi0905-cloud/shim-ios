@@ -17,7 +17,16 @@ name: Sprint 0 Verify (iOS)
 on:
   push:
     branches: [main]
+    # 문서만 바뀐 커밋에서는 macOS runner 를 돌리지 않는다 (D-008 비용 완화)
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.gitignore'
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.gitignore'
   workflow_dispatch:
     inputs:
       xcode_version:

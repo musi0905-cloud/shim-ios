@@ -71,7 +71,15 @@
 `scripts/mac_verify.sh` 는 폐기하지 않는다. Mac을 쓸 수 있게 되면
 동일한 3개 항목을 로컬에서 한 줄로 검증할 수 있고, 실기기 검증(Sprint 3·5)에도 필요하다.
 
-> **Sprint 0은 AC-1 / AC-2 / AC-6이 Mac에서 확인되기 전까지 `DONE`이 아니다.** (D-009)
+### 결과 (2026-08-25)
+
+**CI가 AC-1 / AC-2 / AC-6을 모두 통과했다.** Sprint 0은 `DONE`이다.
+[Run #1](https://github.com/musi0905-cloud/shim-ios/actions/runs/32792825752) — Xcode 26.6 / macOS 26.5.2 / iPhone Air (iOS 26.5).
+상세 결과는 `docs/SPRINTS.md`「CI 검증 결과 기록」참고.
+
+이로써 D-001의 제약(이 세션에서 iOS 빌드 불가)은 **여전히 사실이지만 더 이상 blocker가 아니다.**
+Sprint 1 이후에도 빌드·테스트 검증은 CI를 통해 수행한다.
+단, **실기기 검증(Sprint 3·5)은 CI로 대체할 수 없다.** Simulator는 실기기가 아니다.
 
 ---
 
@@ -303,12 +311,36 @@ D-001에서 확인했듯 이 개발 세션은 Linux이고 Xcode를 설치할 수
 이 CI의 목적은 **Sprint 0 검증**이다. 기능 개발이나 배포 파이프라인이 아니다.
 Sprint 1 이후 CI를 확장할지는 별도로 결정한다.
 
+### 첫 실행 결과 (2026-08-25)
+
+[Run #1](https://github.com/musi0905-cloud/shim-ios/actions/runs/32792825752) — **성공**. 소요 약 3분 30초.
+
+| 항목 | 값 |
+|---|---|
+| Runner | macOS 26.5.2 (arm64) |
+| Xcode | 26.6 |
+| Simulator | iPhone Air (iOS 26.5) |
+| AC-1 / AC-2 / AC-6 | 모두 통과 |
+| Artifact | `sprint0-verify-logs-1` (49 파일, 81.5 KB) |
+
+부수적으로 확인된 사실:
+- XcodeGen 재생성 경로가 실제로 동작한다 (D-006 우선 경로 유효).
+- `DEVELOPMENT_TEAM` 빈 값으로도 Simulator 빌드·테스트가 된다. 코드 서명은 `Sign to Run Locally` (ad-hoc)로 처리됐다 (D-004 검증).
+- runner의 Xcode가 **26.6**, Simulator가 **iOS 26.5**다. 배포 타깃 iOS 17.0(D-003)은 문제없이 동작하나,
+  최신 SDK 기준으로 D-003·D-005를 재검토할 여지가 있다 → **B-006**.
+
 ### 감수하는 비용
 
 macOS runner는 Linux 대비 과금 배수가 높다. 완화책:
 - `concurrency`로 중복 실행 취소
 - `timeout-minutes: 40`으로 무한 대기 차단
+- **`paths-ignore`로 문서 전용 커밋에서는 실행하지 않음** (첫 실행 후 추가)
 - Public 저장소면 GitHub Actions 무료 한도 적용
+
+### 알려진 경고 (실패 아님)
+
+`actions/checkout@v4` 와 `actions/upload-artifact@v4` 가 Node 20 을 타깃해 deprecation 경고가 나온다.
+빌드·테스트에는 영향이 없다. 버전 상향은 **B-005**로 Backlog 처리한다.
 
 ## D-009. Sprint 0 Acceptance Criteria에 Unit Test 성공(AC-6)을 추가한다
 

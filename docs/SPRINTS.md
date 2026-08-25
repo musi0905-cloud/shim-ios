@@ -15,7 +15,7 @@
 
 | Sprint | 이름 | 상태 |
 |---|---|---|
-| 0 | 개발 환경 및 저장소 기초 | **BLOCKED** — Mac에서 AC-1/AC-2/AC-6 검증 대기 |
+| 0 | 개발 환경 및 저장소 기초 | ✅ **DONE** (2026-08-25) — CI가 AC 6개 전부 충족 |
 | 1 | Foundation & RestPlan | TODO |
 | 2 | Timer Engine | TODO |
 | 3 | Audio PoC | TODO |
@@ -37,7 +37,7 @@
 
 ## Sprint 0 — 개발 환경 및 저장소 기초
 
-**상태: BLOCKED (부분 완료)**
+**상태: DONE** (2026-08-25)
 
 ### 목표
 Claude Code가 실제 iOS 개발을 수행할 수 있는 환경과 프로젝트 저장소 기준을 확정한다.
@@ -53,42 +53,62 @@ Claude Code가 실제 iOS 개발을 수행할 수 있는 환경과 프로젝트 
 - [x] `CLAUDE.md`
 - [x] `docs` 디렉터리 구성
 - [x] 제품 기준 문서의 핵심을 repository용 문서로 옮김
-- [x] 빈 SwiftUI 앱 생성 → **코드 및 Xcode 프로젝트 작성 완료 / 빌드 미검증**
-- [ ] Simulator 빌드 확인 → **BLOCKED: macOS·Xcode 없음**
+- [x] 빈 SwiftUI 앱 생성 → **작성 완료 / CI 빌드 검증 완료**
+- [x] Simulator 빌드 확인 → **CI에서 성공 (macos-latest)**
 
-### Acceptance Criteria
+### Acceptance Criteria — 전부 충족 ✅
 
-Product Owner 결정으로 **AC-6(Unit Test 성공)이 추가**되어 총 6개다 (D-009).
+Product Owner 결정으로 AC-6(Unit Test 성공)이 추가되어 총 6개다 (D-009).
 
-| # | 기준 | 상태 |
-|---|---|---|
-| AC-1 | 프로젝트가 Xcode에서 열린다 | ⏳ **Mac 검증 대기** |
-| AC-2 | iOS Simulator 대상 build 성공 | ⏳ **Mac 검증 대기** |
-| AC-3 | repository에 비밀정보가 없다 | ✅ 충족 — `scripts/verify_repo.py` 시크릿 스캔 통과 |
-| AC-4 | `CLAUDE.md`가 운영규칙을 포함한다 | ✅ 충족 |
-| AC-5 | 현재 프로젝트 구조와 빌드 방법이 README에 기록된다 | ✅ 충족 |
-| AC-6 | **Unit Test 성공** (D-009 추가) | ⏳ **Mac 검증 대기** |
+| # | 기준 | 상태 | 근거 |
+|---|---|---|---|
+| AC-1 | 프로젝트가 Xcode에서 열린다 | ✅ 충족 | CI — `xcodebuild -list` 파싱 성공, 타깃 `Shim`/`ShimTests`·스킴 `Shim` 확인 |
+| AC-2 | iOS Simulator 대상 build 성공 | ✅ 충족 | CI — `** BUILD SUCCEEDED **` |
+| AC-3 | repository에 비밀정보가 없다 | ✅ 충족 | `scripts/verify_repo.py` 시크릿 스캔 통과 |
+| AC-4 | `CLAUDE.md`가 운영규칙을 포함한다 | ✅ 충족 | `verify_repo.py` 운영규칙 8개 항목 확인 |
+| AC-5 | 프로젝트 구조·빌드 방법이 README에 기록 | ✅ 충족 | `README.md` |
+| AC-6 | **Unit Test 성공** (D-009) | ✅ 충족 | CI — `** TEST SUCCEEDED **`, 2 tests / 0 failures |
 
-### Sprint 0 DONE 조건
+### CI 검증 결과 기록 (지시 8)
 
-**GitHub Actions macOS CI가 AC-1 / AC-2 / AC-6을 모두 통과해야 한다.** (D-008, 2026-08-25 재검토)
+**워크플로**: `.github/workflows/ios-sprint0-verify.yml`
+**Run**: [#1](https://github.com/musi0905-cloud/shim-ios/actions/runs/32792825752) · conclusion `success` · 2026-08-25 00:14–00:18 UTC (약 3분 30초)
+**Commit**: `9dabca73e2b9bce2aecc15c772650e40ef77c270`
 
-워크플로: `.github/workflows/ios-sprint0-verify.yml` (`macos-latest`)
-`ios/project.yml` 기준으로 XcodeGen 재생성한 프로젝트를 검증 대상으로 삼는다 (D-006).
+| 항목 | 값 |
+|---|---|
+| Runner | `macos-latest` — macOS 26.5.2 (arm64) |
+| Xcode | **Xcode 26.6** |
+| 프로젝트 생성 | `ios/project.yml` 기준 **XcodeGen 재생성** (D-006 우선 경로) |
+| Simulator | **iPhone Air (iOS 26.5)** — UDID 지정 |
+| 코드 서명 | `Sign to Run Locally` (ad-hoc) — `DEVELOPMENT_TEAM` 빈 값으로 Simulator 빌드 성공 (D-004 검증됨) |
+| Artifact | `sprint0-verify-logs-1` — 49개 파일, 81.5 KB, 30일 보관 |
 
-Mac을 쓸 수 있는 경우 `./scripts/mac_verify.sh` 로 동일한 3개 항목을 로컬 검증할 수도 있다.
-(README 「Mac 검증 절차」 참고 — CI와 병행 가능하며 실기기 검증 단계에서도 사용한다.)
+**빌드 결과**
+```
+** BUILD SUCCEEDED **
+```
 
-**CI가 성공하기 전 Sprint 1은 시작하지 않는다.**
+**테스트 결과**
+```
+Test Case '-[ShimTests.ShimSmokeTests testAppEntryPointExists]' passed (0.004 seconds).
+Test Case '-[ShimTests.ShimSmokeTests testTestTargetRuns]'      passed (0.001 seconds).
+Executed 2 tests, with 0 failures (0 unexpected) in 0.005 seconds
+** TEST SUCCEEDED **
+```
+
+전체 로그의 실제 `error:` 발생 건수: **0건**.
+
+### 검증으로 확인된 사실
+
+- 수기 작성한 `project.pbxproj`가 아니라 **XcodeGen이 `ios/project.yml`로 재생성한 프로젝트**가 검증을 통과했다. D-006의 우선 경로가 의도대로 동작한다.
+- `DEVELOPMENT_TEAM`을 빈 값으로 커밋해도 Simulator 빌드·테스트에 지장이 없다 (D-004).
+- 배포 타깃 iOS 17.0(D-003)은 runner의 iOS 26.5 Simulator에서 정상 동작한다.
 
 ### 완료된 후속 작업
 
 - ✅ **저장소 분리** — `musi0905-cloud/shim-ios`로 이전 완료 (2026-08-25, D-002)
-  기존 Apps Script 파일 5개는 `musi0905-cloud/App`에 그대로 유지.
-
-### 남은 항목
-
-CI 검증 3종(AC-1 / AC-2 / AC-6)이 유일한 잔여 항목이다.
+- ✅ **macOS CI 도입** — Sprint 0 검증 수단으로 채택, 첫 실행에서 통과 (2026-08-25, D-008)
 
 ---
 
@@ -400,4 +420,6 @@ OpenAI Key를 앱에 넣지 않는 서버 구조를 만든다.
 | B-001 | 저장소 분리 — 「쉼」 iOS를 `musi0905-cloud/shim-ios`로 분리 | Sprint 0 | ✅ **완료** (2026-08-25, D-002) |
 | B-002 | GitHub Actions macOS CI 도입 | Sprint 0 | ✅ **완료** — Sprint 0 검증 수단으로 도입 (2026-08-25, D-008) |
 | B-003 | App Icon 실제 에셋 제작 (현재 빈 AppIcon 슬롯) | Sprint 0 | 대기 — 디자인 필요 |
+| B-005 | CI actions 버전 상향 (`checkout@v4`/`upload-artifact@v4` → Node 20 deprecation 경고) | Sprint 0 | 대기 — 경고이며 실패 아님 |
+| B-006 | Xcode 26.6 / iOS 26 SDK 기준 재검토 — 배포 타깃·Swift 언어 모드(D-003, D-005) | Sprint 0 | 대기 — runner 실제 환경 확인 후 |
 | B-004 | 저장소 라이선스 결정 | Sprint 0 | 대기 — Product Owner 결정 필요 |
