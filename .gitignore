@@ -18,6 +18,8 @@ GoogleService-Info.plist
 build/
 # scripts/mac_verify.sh 로그
 build-logs/
+# CI 검증 로그 (artifact 로 업로드)
+ci-logs/
 DerivedData/
 *.xcuserstate
 *.xcuserdatad/

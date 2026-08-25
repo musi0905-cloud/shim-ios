@@ -58,13 +58,18 @@
 - 장점: 실기기가 필요한 항목(Sprint 3·5)과 그 외를 깔끔히 분리할 수 있다.
 - 단점: 비용과 설정 부담이 가장 크다.
 
-### 채택 (Product Owner 결정, 2026-08-24)
+### 채택
 
-**1안 — PO의 Mac 로컬 환경에서 검증.** 2안(macOS CI)은 Sprint 0의 필수 조건에서 제외하고
-Backlog(B-002)로 유지한다. 근거와 감수 리스크는 **D-008** 참고.
+| 일자 | 채택안 |
+|---|---|
+| 2026-08-24 | 1안 — PO의 Mac 로컬 검증 |
+| **2026-08-25** | **2안 — GitHub Actions macOS runner** (재검토, D-008) |
 
-검증 부담을 줄이기 위해 `scripts/mac_verify.sh`를 제공한다.
-Mac에서 한 줄로 AC-1 / AC-2 / AC-6을 순서대로 검증하고 로그를 남긴다.
+로컬 Mac 검증이 불가능한 것으로 확인되어 **2안을 Sprint 0의 검증 수단으로 채택**했다.
+`.github/workflows/ios-sprint0-verify.yml` 이 AC-1 / AC-2 / AC-6을 검증한다.
+
+`scripts/mac_verify.sh` 는 폐기하지 않는다. Mac을 쓸 수 있게 되면
+동일한 3개 항목을 로컬에서 한 줄로 검증할 수 있고, 실기기 검증(Sprint 3·5)에도 필요하다.
 
 > **Sprint 0은 AC-1 / AC-2 / AC-6이 Mac에서 확인되기 전까지 `DONE`이 아니다.** (D-009)
 
@@ -240,30 +245,70 @@ Sprint 1부터 파일이 늘어나므로 이 점을 `README.md`에 명시했다.
 
 ---
 
-## D-008. GitHub Actions macOS CI는 Sprint 0의 필수 조건이 아니다
+## D-008. GitHub Actions macOS CI를 Sprint 0의 검증 수단으로 도입한다
 
 - **Sprint**: 0
-- **상태**: **확정** (Product Owner 결정, 2026-08-24)
+- **상태**: **확정** (Product Owner 재검토 결정, 2026-08-25)
 - **문제 구분**: C — 개발 환경 제약
 
-### 결정 (Product Owner)
+### 결정 이력
 
-> "GitHub Actions macOS CI는 현재 Sprint 0 완료의 필수 조건으로 만들지 않는다.
-> MVP 초기 기능이 안정화된 이후 도입할 Backlog로 유지한다."
+| 일자 | 결정 |
+|---|---|
+| 2026-08-24 | macOS CI를 Sprint 0 필수 조건에서 제외. PO의 Mac 로컬 검증(1안) 채택. Backlog B-002로 유지 |
+| **2026-08-25** | **재검토 — Sprint 0의 유일한 blocker가 macOS/Xcode 검증이고 로컬 Mac 검증이 불가능하므로 CI를 검증 수단으로 도입** |
 
-### 결과
+### 재검토 근거 (Product Owner)
 
-- D-001의 대응 옵션 중 **1안(PO의 Mac 로컬 검증)** 을 채택한다.
-- 2안(macOS CI)은 폐기하지 않고 **B-002로 Backlog에 유지**한다. 도입 시점은 MVP 초기 기능 안정화 이후.
-- Sprint 0의 AC-1 / AC-2 / AC-6은 **Product Owner의 Mac 환경에서 수동 검증**으로 충족한다.
-- 검증 부담을 줄이기 위해 `scripts/mac_verify.sh`를 제공한다. Mac에서 한 줄로 3개 항목을 검증하고 로그를 남긴다.
+> "Sprint 0의 유일한 blocker가 macOS/Xcode 검증이므로 D-008을 재검토한다.
+> 현재 개발 환경이 Linux이고 로컬 Mac 검증이 불가능한 경우에만
+> GitHub Actions macOS runner를 Sprint 0 검증 수단으로 도입한다.
+> **목표는 기능 개발이 아니라 AC-1, AC-2, AC-6 검증이다.**"
 
-### 감수하는 리스크
+D-001에서 확인했듯 이 개발 세션은 Linux이고 Xcode를 설치할 수 없다.
+로컬 Mac 검증이 불가능한 상황에서 Sprint 0을 닫을 유일한 수단이 CI다.
 
-CI가 없으므로 **회귀를 자동으로 잡지 못한다.** Sprint가 진행될수록 "Linux에서 작성 → Mac에서 검증" 왕복 비용이 커진다.
-Sprint 2~3쯤 이 비용이 체감되면 B-002 도입 시점을 다시 논의한다.
+### 결정
 
----
+`.github/workflows/ios-sprint0-verify.yml` 을 도입한다.
+
+| 지시 항목 | 구현 |
+|---|---|
+| 1. macOS runner 사용 | `runs-on: macos-latest` |
+| 2. Xcode 버전 출력 | `xcodebuild -version` + 설치된 Xcode 목록 + macOS/아키텍처 |
+| 3. XcodeGen 설치 및 `ios/project.yml`로 프로젝트 생성 | `brew install xcodegen` → `cd ios && xcodegen generate` (D-006 우선 경로) |
+| 4. 사용 가능한 iOS Simulator 목록 확인 | `xcrun simctl list runtimes` / `devices available` + `scripts/ci/select_simulator.py` |
+| 5. Simulator 대상 build | `xcodebuild build -destination "platform=iOS Simulator,id=<UDID>"` → **AC-2** |
+| 6. XCTest 실행 | `xcodebuild test` (동일 destination) → **AC-6** |
+| 7. 실패 시 전체 로그 artifact 저장 | `actions/upload-artifact@v4`, `if: always()`, 30일 보관 |
+| 8. 성공 시 결과를 Sprint 0 보고서에 기록 | `$GITHUB_STEP_SUMMARY`에 AC 표·환경·테스트 케이스 기록 + `docs/SPRINTS.md` 반영 |
+
+**AC-1(Xcode에서 프로젝트 열기)** 은 `xcodebuild -list -project`로 검증한다.
+이 명령은 Xcode의 프로젝트 파서를 그대로 사용하므로, 성공하면 Xcode가 프로젝트를 해석할 수 있다는 뜻이다.
+추가로 타깃 `Shim` / `ShimTests` 와 스킴 `Shim` 의 존재를 확인한다.
+
+### 설계상의 선택
+
+- **artifact를 성공 시에도 업로드한다.** 지시 7은 실패 시 저장을 요구하지만,
+  지시 8(성공 결과를 보고서에 기록)의 근거를 남기려면 성공 로그도 필요하다.
+- **Simulator를 이름이 아닌 UDID로 지정한다.** 같은 이름의 기기가 여러 런타임에 존재할 수 있어
+  `-destination name=...` 은 모호하다. 선택 로직은 `scripts/ci/select_simulator.py` 로 분리해
+  Linux 개발 세션에서도 fixture로 테스트할 수 있게 했다.
+- **iOS 17.0 미만 런타임은 제외한다.** 배포 타깃이 17.0이므로(D-003) 그 미만 런타임에서는 실행되지 않는다.
+- **`concurrency`로 중복 실행을 취소한다.** macOS runner는 과금 배수가 높다.
+- **`permissions: contents: read`** 로 최소 권한만 부여한다.
+
+### 범위 제한
+
+이 CI의 목적은 **Sprint 0 검증**이다. 기능 개발이나 배포 파이프라인이 아니다.
+Sprint 1 이후 CI를 확장할지는 별도로 결정한다.
+
+### 감수하는 비용
+
+macOS runner는 Linux 대비 과금 배수가 높다. 완화책:
+- `concurrency`로 중복 실행 취소
+- `timeout-minutes: 40`으로 무한 대기 차단
+- Public 저장소면 GitHub Actions 무료 한도 적용
 
 ## D-009. Sprint 0 Acceptance Criteria에 Unit Test 성공(AC-6)을 추가한다
 

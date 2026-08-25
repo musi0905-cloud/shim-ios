@@ -79,6 +79,8 @@ def check_required_files() -> None:
         "ios/Shim/Assets.xcassets/AccentColor.colorset/Contents.json",
         "ios/ShimTests/ShimSmokeTests.swift",
         "scripts/mac_verify.sh",
+        "scripts/ci/select_simulator.py",
+        ".github/workflows/ios-sprint0-verify.yml",
     ]
     missing = [p for p in required if not os.path.exists(rel(p))]
     if missing:
@@ -116,9 +118,10 @@ def check_readme() -> None:
         "빌드 방법": "xcodebuild",
         "스킴 이름": "-scheme Shim",
         "환경 제약 명시": "Linux",
-        "Mac 검증 절차": "Mac 검증 절차",
+        "Sprint 0 검증 절차": "Sprint 0 검증",
         "XcodeGen 재생성 명령": "xcodegen generate",
-        "검증 자동화 스크립트": "scripts/mac_verify.sh",
+        "CI 워크플로 언급": "ios-sprint0-verify.yml",
+        "로컬 검증 스크립트": "scripts/mac_verify.sh",
         "Unit Test 검증": "xcodebuild test",
     }
     missing = [k for k, v in needed.items() if v not in text]
@@ -376,6 +379,63 @@ def check_secrets(files: list[str]) -> None:
         ok(f"시크릿 스캔 통과 — 추적 파일 {scanned}개, 패턴 {len(SECRET_PATTERNS)}종 (AC-3)")
 
 
+# ------------------------------------------------- 6.5 CI 워크플로 정합성
+def check_ci_workflow() -> None:
+    """CI 워크플로가 Sprint 0 검증 요건을 실제로 담고 있는지 확인한다.
+
+    YAML 문법 오류는 push 후에야 드러나므로 여기서 먼저 잡는다.
+    """
+    path = rel(".github/workflows/ios-sprint0-verify.yml")
+    text = read(path)
+
+    try:
+        import yaml  # type: ignore
+    except ImportError:
+        warn("PyYAML 미설치 — CI 워크플로 YAML 파싱 검사를 건너뛴다")
+        parsed = None
+    else:
+        try:
+            parsed = yaml.safe_load(text)
+            ok("CI 워크플로: YAML 파싱 성공")
+        except yaml.YAMLError as exc:  # noqa: PERF203
+            fail(f"CI 워크플로: YAML 파싱 실패 — {exc}")
+            return
+
+    if parsed:
+        job = parsed.get("jobs", {}).get("verify")
+        if not job:
+            fail("CI 워크플로: jobs.verify 없음")
+            return
+        if job.get("runs-on") != "macos-latest":
+            fail(f"CI 워크플로: runs-on 이 macos-latest 가 아니다 ({job.get('runs-on')})")
+        else:
+            ok("CI 워크플로: runs-on = macos-latest")
+        if not job.get("timeout-minutes"):
+            warn("CI 워크플로: timeout-minutes 미설정 — macOS runner 과금 위험")
+        else:
+            ok(f"CI 워크플로: timeout-minutes = {job['timeout-minutes']}")
+        ok(f"CI 워크플로: 스텝 {len(job.get('steps', []))}개")
+
+    # Product Owner 지시 1~8이 실제로 반영됐는지 문자열로 확인
+    required = {
+        "1. macOS runner": "macos-latest",
+        "2. Xcode 버전 출력": "xcodebuild -version",
+        "3. XcodeGen 설치": "brew install xcodegen",
+        "3. project.yml 로 생성": "xcodegen generate",
+        "4. Simulator 목록 확인": "xcrun simctl list",
+        "5. Simulator build": "xcodebuild build",
+        "6. XCTest 실행": "xcodebuild test",
+        "7. 로그 artifact 저장": "upload-artifact",
+        "8. 결과 기록": "GITHUB_STEP_SUMMARY",
+        "AC-1 검증": "xcodebuild -list",
+    }
+    missing = [k for k, v in required.items() if v not in text]
+    if missing:
+        fail(f"CI 워크플로에 요건 누락: {', '.join(missing)}")
+    else:
+        ok(f"CI 워크플로: Sprint 0 검증 요건 {len(required)}종 모두 포함")
+
+
 def check_gitignore() -> None:
     text = read(rel(".gitignore"))
     required = [".env", "*.p12", "*.mobileprovision", "AuthKey_*.p8", "xcuserdata/", "DerivedData/"]
@@ -398,6 +458,7 @@ def main() -> int:
     check_pbxproj()
     check_scheme()
     check_spec_consistency()
+    check_ci_workflow()
     check_gitignore()
     check_secrets(tracked_files())
 

@@ -10,7 +10,9 @@
 > 이 저장소는 `musi0905-cloud/App`에서 「쉼」 관련 파일만 분리해 만들었다 (`docs/DECISIONS.md` D-002).
 > 무관한 Google Apps Script 프로젝트는 `App` 저장소에 그대로 남아 있다.
 
-Sprint 0은 아래 [Mac 검증 절차](#mac-검증-절차-sprint-0-종료-조건)가 **3개 모두 성공한 뒤에만** DONE 처리된다.
+[![Sprint 0 Verify (iOS)](https://github.com/musi0905-cloud/shim-ios/actions/workflows/ios-sprint0-verify.yml/badge.svg)](https://github.com/musi0905-cloud/shim-ios/actions/workflows/ios-sprint0-verify.yml)
+
+Sprint 0은 아래 [Sprint 0 검증](#sprint-0-검증-종료-조건) 3개가 **모두 성공한 뒤에만** DONE 처리된다.
 Sprint 1은 그 전까지 시작하지 않는다.
 
 ---
@@ -45,9 +47,13 @@ Google Drive 문서가 **최상위 제품 기준**이고, 이 저장소의 문�
 │   ├── SPRINTS.md                 # Sprint Backlog + 현재 상태
 │   └── DECISIONS.md               # 기술 결정 기록
 │
+├── .github/workflows/
+│   └── ios-sprint0-verify.yml     # Sprint 0 검증 CI (macOS runner) — AC-1/AC-2/AC-6
+│
 ├── scripts/
 │   ├── verify_repo.py             # 저장소 정적 검증 (Linux/Mac 모두 실행 가능)
-│   └── mac_verify.sh              # Mac 전용 Sprint 0 검증 자동화 (아래 참고)
+│   ├── mac_verify.sh              # Mac 로컬 Sprint 0 검증 자동화
+│   └── ci/select_simulator.py     # CI용 iOS Simulator 선택기
 │
 └── ios/
     ├── project.yml                # XcodeGen 스펙 — 프로젝트 정의의 기준 (D-006)
@@ -99,7 +105,7 @@ XcodeGen이 생성한 프로젝트는 파일을 명시적으로 나열하므로,
 
 ---
 
-## Mac 검증 절차 (Sprint 0 종료 조건)
+## Sprint 0 검증 (종료 조건)
 
 Product Owner 결정에 따라 **다음 3개가 모두 성공해야 Sprint 0을 DONE 처리한다.**
 
@@ -109,32 +115,67 @@ Product Owner 결정에 따라 **다음 3개가 모두 성공해야 Sprint 0을 
 | 2 | iOS Simulator 대상 build 성공 | AC-2 |
 | 3 | Unit Test 성공 | AC-6 |
 
-### 방법 A — 자동화 스크립트 (권장)
+개발 세션이 Linux라 로컬 Mac 검증이 불가능하므로 **GitHub Actions macOS runner를 검증 수단으로 사용한다** (D-008).
 
-Mac에서 아래 한 줄이면 위 3개를 순서대로 검증하고 로그를 남긴다.
+### 방법 A — GitHub Actions CI (현재 검증 수단)
+
+워크플로: [`.github/workflows/ios-sprint0-verify.yml`](.github/workflows/ios-sprint0-verify.yml)
+
+| 트리거 | 조건 |
+|---|---|
+| `push` | `main` 브랜치 |
+| `pull_request` | 모든 PR |
+| `workflow_dispatch` | 수동 실행 (Xcode 버전 지정 가능) |
+
+수행 내용:
+
+1. `macos-latest` runner에서 실행
+2. macOS·Xcode·Swift 버전 출력
+3. `brew install xcodegen` → `cd ios && xcodegen generate` (D-006 우선 경로)
+4. `xcodebuild -list`로 프로젝트 파싱·타깃·스킴 확인 → **AC-1**
+5. `xcrun simctl list`로 런타임·기기 확인, iOS 17.0+ iPhone을 UDID로 선택
+6. `xcodebuild build` → **AC-2**
+7. `xcodebuild test` → **AC-6**
+8. 결과를 Job Summary에 표로 기록, 전체 로그를 artifact로 업로드 (성공·실패 모두, 30일)
+
+**결과 확인**: 저장소 → Actions → `Sprint 0 Verify (iOS)` → 해당 run
+- **Summary** 탭: 환경 정보와 AC별 통과/실패 표
+- **Artifacts**: `sprint0-verify-logs-<번호>` — `xcodebuild` 전체 로그와 `.xcresult` 번들
+
+수동 실행:
+
+```bash
+# GitHub 웹: Actions → Sprint 0 Verify (iOS) → Run workflow
+# 또는 gh CLI:
+gh workflow run "Sprint 0 Verify (iOS)" --ref main
+gh run watch
+```
+
+### 방법 B — Mac 로컬 (선택)
+
+Mac을 쓸 수 있으면 동일한 3개 항목을 한 줄로 검증할 수 있다.
+CI와 병행 가능하며, 실기기 검증(Sprint 3·5)에서도 이 스크립트를 사용한다.
 
 ```bash
 ./scripts/mac_verify.sh
 ```
 
-- XcodeGen이 설치돼 있으면 **`ios/project.yml` 기준으로 프로젝트를 재생성한 뒤** 검증한다 (D-006).
-- XcodeGen이 없으면 커밋된 `ios/Shim.xcodeproj`로 fallback하고, 그 사실을 로그에 남긴다.
+- XcodeGen이 있으면 `ios/project.yml` 기준으로 재생성한 뒤 검증한다 (D-006).
+- 없으면 커밋된 `ios/Shim.xcodeproj`로 fallback하고 그 사실을 로그에 남긴다.
 - 사용 가능한 iPhone Simulator를 자동 탐지한다.
-- 전체 로그가 `build-logs/mac_verify_<타임스탬프>.log`에 저장된다. (이 디렉터리는 `.gitignore` 처리됨)
-
-실패하면 스크립트가 **어느 단계에서 실패했는지와 로그 경로**를 출력한다. 그 로그를 그대로 전달하면 된다.
+- 로그: `build-logs/mac_verify_<타임스탬프>.log` (gitignore 처리됨)
 
 옵션:
 
 ```bash
 ./scripts/mac_verify.sh --simulator "iPhone 16 Pro"   # Simulator 지정
-./scripts/mac_verify.sh --no-xcodegen                 # XcodeGen 건너뛰고 커밋된 프로젝트로 검증
-./scripts/mac_verify.sh --open                        # 검증 성공 후 Xcode로 열기
+./scripts/mac_verify.sh --no-xcodegen                 # 커밋된 프로젝트로 검증
+./scripts/mac_verify.sh --open                        # 성공 후 Xcode로 열기
 ```
 
-### 방법 B — 수동 절차
+### 방법 C — 수동 명령 (참고)
 
-자동화 스크립트가 동작하지 않을 때 아래를 순서대로 실행한다.
+위 두 방법이 모두 막혔을 때 아래를 순서대로 실행한다.
 
 ```bash
 # ── 0. 사전 확인 ────────────────────────────────────────────
@@ -174,24 +215,19 @@ xcodebuild test \
 # 기대: ** TEST SUCCEEDED **  (ShimSmokeTests 2개 통과)
 ```
 
-### 검증 후 할 일
+### 검증 실패 시
 
-**성공한 경우** — 아래를 알려주면 Sprint 0을 DONE 처리하고 Sprint 1 계획을 제시한다.
-
-1. `xcodebuild -version` 출력
-2. `** BUILD SUCCEEDED **` / `** TEST SUCCEEDED **` 확인 여부
-3. XcodeGen을 사용했는지 여부
-4. `xcodegen generate` 후 `git status`에 `ios/Shim.xcodeproj/project.pbxproj` 변경이 잡혔다면 그 사실
-   → 생성된 프로젝트가 기준이 되므로 **그 변경을 커밋한다** (D-006)
-
-**실패한 경우** — 아래를 그대로 전달하면 원인을 분석해 수정한다.
-
-1. 실패한 단계 번호 (1~5) 또는 `mac_verify.sh` 로그 파일
-2. 오류 메시지 전문 (`xcodebuild` 출력의 `error:` 줄 포함)
-3. `xcodebuild -version` 출력
+CI라면 **Actions → 해당 run → Summary**의 실패 로그 발췌와 `sprint0-verify-logs-<번호>` artifact를 확인한다.
+로컬이라면 `mac_verify.sh`가 출력하는 실패 단계 번호와 로그 경로를 확인한다.
 
 > `ios/Shim.xcodeproj/project.pbxproj`는 Xcode 없이 수기로 작성됐다.
-> **문제가 있으면 억지로 유지하지 않고 `ios/project.yml` 기준으로 재생성한 결과로 교체한다** (D-006, Product Owner 결정).
+> **문제가 있으면 억지로 유지하지 않고 `ios/project.yml` 기준으로 재생성한 결과로 교체한다**
+> (D-006, Product Owner 결정). CI는 이미 재생성 경로를 사용한다.
+
+### 프로젝트 파일 재생성 후 커밋
+
+`xcodegen generate` 실행 후 `ios/Shim.xcodeproj/project.pbxproj`에 변경이 생기면
+**생성된 프로젝트가 기준이므로 그 변경을 커밋한다** (D-006).
 
 ---
 
@@ -249,10 +285,10 @@ python3 scripts/verify_repo.py
 Xcode와 iOS Simulator는 macOS 전용이며 Linux에서 우회할 방법이 없다.
 SwiftUI·UIKit·AVFoundation 등은 Apple 플랫폼 전용이라 Linux Swift 툴체인으로도 컴파일 검증이 불가능하다.
 
-따라서 **AC-1 / AC-2 / AC-6은 Product Owner의 Mac 환경에서만 확인 가능하다.** → `docs/DECISIONS.md` **D-001**
+따라서 **AC-1 / AC-2 / AC-6은 이 세션에서 직접 확인할 수 없다.** → `docs/DECISIONS.md` **D-001**
 
-GitHub Actions macOS CI는 Product Owner 결정에 따라 **Sprint 0 완료의 필수 조건이 아니다.**
-MVP 초기 기능 안정화 이후 도입할 Backlog 항목으로 유지한다 (B-002, D-008).
+따라서 **GitHub Actions macOS runner가 Sprint 0의 검증 수단이다** (D-008, 2026-08-25 재검토).
+`.github/workflows/ios-sprint0-verify.yml` 이 AC-1 / AC-2 / AC-6을 검증한다.
 
 > `CLAUDE.md` §5에 따라, 검증되지 않은 항목을 "완료"라고 보고하지 않는다.
 

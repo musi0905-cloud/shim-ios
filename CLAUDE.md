@@ -217,7 +217,8 @@ Screen Time Shield / Focus 강제 제어 / 커뮤니티 / SNS / 긴 AI 상담 �
 
 **이 환경에서는 Xcode 빌드·Simulator 빌드·실기기 검증을 수행할 수 없다.**
 Swift 코드와 Xcode 프로젝트는 작성 가능하지만, **"빌드 성공"이라고 보고해서는 안 된다.**
-빌드·테스트 검증은 Product Owner의 macOS + Xcode 환경에서 수행한다. (D-001, D-008)
+빌드·테스트 검증은 **GitHub Actions macOS runner** 에서 수행한다. (D-001, D-008)
+CI 결과를 확인하지 않은 상태에서 빌드·테스트가 통과했다고 보고하지 않는다.
 
 ### Sprint 0 상태 — BLOCKED
 
@@ -229,7 +230,8 @@ Sprint 0은 아래 3개가 Mac에서 확인되기 전까지 **DONE이 아니다.
 | AC-2 | iOS Simulator 대상 build 성공 |
 | AC-6 | Unit Test 성공 |
 
-검증 방법: Mac에서 `./scripts/mac_verify.sh` (절차는 `README.md` 「Mac 검증 절차」)
+검증 방법: **GitHub Actions macOS CI** — `.github/workflows/ios-sprint0-verify.yml` (D-008)
+Mac을 쓸 수 있으면 `./scripts/mac_verify.sh` 로 동일 항목을 로컬 검증할 수도 있다.
 
 **Sprint 1은 위 3개가 성공하기 전까지 시작하지 않는다.** (Product Owner 결정, 2026-08-24)
 

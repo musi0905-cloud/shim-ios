@@ -1,0 +1,282 @@
+# Sprint 0 검증 CI — 「쉼」 iOS
+#
+# 목적은 기능 개발이 아니라 Sprint 0 Acceptance Criteria 검증이다.
+# (docs/DECISIONS.md D-008, Product Owner 재검토 결정 2026-08-25)
+#
+#   AC-1  Xcode 에서 프로젝트가 열린다
+#   AC-2  iOS Simulator 대상 build 성공
+#   AC-6  Unit Test(XCTest) 성공
+#
+# 개발 세션이 Linux 라 로컬 Mac 검증이 불가능하므로(D-001) macOS runner 를
+# Sprint 0 의 검증 수단으로 사용한다.
+#
+# 프로젝트는 ios/project.yml(XcodeGen)을 기준으로 재생성한다(D-006).
+
+name: Sprint 0 Verify (iOS)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      xcode_version:
+        description: '사용할 Xcode 버전 (예: 16.2). 비우면 runner 기본값'
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: AC-1 / AC-2 / AC-6
+    runs-on: macos-latest
+    timeout-minutes: 40
+
+    env:
+      IOS_DIR: ios
+      PROJECT: ios/Shim.xcodeproj
+      SCHEME: Shim
+      LOG_DIR: ci-logs
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 로그 디렉터리 준비
+        run: mkdir -p "$LOG_DIR"
+
+      # ── 1~2. macOS runner / Xcode 버전 출력 ────────────────────────
+      - name: Runner 및 Xcode 버전 출력
+        id: xcode
+        run: |
+          set -euo pipefail
+
+          echo "::group::runner 정보"
+          echo "macOS      : $(sw_vers -productVersion) ($(sw_vers -buildVersion))"
+          echo "아키텍처   : $(uname -m)"
+          echo "::endgroup::"
+
+          echo "::group::설치된 Xcode 목록"
+          ls -d /Applications/Xcode*.app 2>/dev/null || echo "(없음)"
+          echo "::endgroup::"
+
+          REQUESTED="${{ inputs.xcode_version }}"
+          if [ -n "$REQUESTED" ]; then
+            CANDIDATE="/Applications/Xcode_${REQUESTED}.app"
+            if [ -d "$CANDIDATE" ]; then
+              sudo xcode-select -s "$CANDIDATE/Contents/Developer"
+              echo "Xcode $REQUESTED 로 전환했다."
+            else
+              echo "::warning::요청한 Xcode $REQUESTED 가 없다. runner 기본값을 사용한다."
+            fi
+          fi
+
+          {
+            echo "macOS: $(sw_vers -productVersion) ($(sw_vers -buildVersion)) $(uname -m)"
+            xcodebuild -version
+            echo "xcode-select: $(xcode-select -p)"
+            swift --version 2>&1 | head -2 || true
+          } | tee "$LOG_DIR/xcode-version.txt"
+
+          XCODE_MAJOR="$(xcodebuild -version | sed -n 's/^Xcode \([0-9]*\).*/\1/p')"
+          XCODE_FULL="$(xcodebuild -version | head -1)"
+          echo "xcode_major=${XCODE_MAJOR}" >> "$GITHUB_OUTPUT"
+          echo "xcode_full=${XCODE_FULL}"   >> "$GITHUB_OUTPUT"
+          echo "macos_version=$(sw_vers -productVersion)" >> "$GITHUB_OUTPUT"
+
+          # 커밋된 project.pbxproj 는 objectVersion 77(Xcode 16+)이다.
+          # 이 CI 는 XcodeGen 재생성 경로를 쓰므로 경고만 남긴다(D-006).
+          if [ -n "$XCODE_MAJOR" ] && [ "$XCODE_MAJOR" -lt 16 ]; then
+            echo "::warning::Xcode $XCODE_MAJOR 감지. 커밋된 project.pbxproj 는 Xcode 16+ 전용이다. XcodeGen 재생성 경로로 진행한다."
+          fi
+
+      # ── 3. XcodeGen 설치 및 프로젝트 생성 ──────────────────────────
+      - name: XcodeGen 설치
+        run: |
+          set -euo pipefail
+          if command -v xcodegen >/dev/null 2>&1; then
+            echo "이미 설치됨"
+          else
+            brew install xcodegen 2>&1 | tail -20
+          fi
+          xcodegen --version 2>&1 | tee "$LOG_DIR/xcodegen-version.txt"
+
+      - name: 'ios/project.yml 로 Xcode 프로젝트 생성 (D-006)'
+        run: |
+          set -euo pipefail
+          cd "$IOS_DIR"
+          xcodegen generate 2>&1 | tee "../$LOG_DIR/xcodegen-generate.log"
+          echo
+          echo "생성 결과:"
+          ls -la Shim.xcodeproj
+
+      # ── 4(AC-1). Xcode 가 프로젝트를 여는지 확인 ────────────────────
+      # xcodebuild -list 는 Xcode 의 프로젝트 파서를 그대로 사용한다.
+      # 성공하면 Xcode 가 이 프로젝트를 해석할 수 있다는 뜻이다.
+      - name: 'AC-1 — Xcode 프로젝트 열기'
+        id: ac1
+        run: |
+          set -euo pipefail
+          xcodebuild -list -project "$PROJECT" 2>&1 | tee "$LOG_DIR/ac1-project-list.log"
+
+          grep -qE '^\s+Shim$'      "$LOG_DIR/ac1-project-list.log" || { echo "::error::타깃 Shim 없음"; exit 1; }
+          grep -qE '^\s+ShimTests$' "$LOG_DIR/ac1-project-list.log" || { echo "::error::타깃 ShimTests 없음"; exit 1; }
+          sed -n '/Schemes:/,$p' "$LOG_DIR/ac1-project-list.log" | grep -qE '^\s+Shim$' \
+            || { echo "::error::스킴 Shim 없음"; exit 1; }
+
+          echo "AC-1 통과 — 프로젝트 파싱, 타깃 2개, 스킴 Shim 확인"
+
+      # ── 5. 사용 가능한 iOS Simulator 목록 확인 및 선택 ──────────────
+      - name: 사용 가능한 iOS Simulator 확인
+        id: sim
+        run: |
+          set -euo pipefail
+
+          echo "::group::설치된 iOS 런타임"
+          xcrun simctl list runtimes 2>&1 | tee "$LOG_DIR/simulator-runtimes.txt"
+          echo "::endgroup::"
+
+          echo "::group::사용 가능한 기기"
+          xcrun simctl list devices available 2>&1 | tee "$LOG_DIR/simulator-devices.txt"
+          echo "::endgroup::"
+
+          xcrun simctl list devices available --json > "$LOG_DIR/simulator-devices.json"
+
+          # 배포 타깃이 iOS 17.0(D-003)이므로 17.0 이상 런타임의 iPhone 중
+          # 가장 높은 버전을 고른다. 이름은 모호할 수 있어 UDID 를 쓴다.
+          if ! SELECTED="$(python3 scripts/ci/select_simulator.py --min-ios 17.0 < "$LOG_DIR/simulator-devices.json")"; then
+            echo "::error::iOS 17.0 이상 런타임의 사용 가능한 iPhone Simulator 가 없다."
+            cat "$LOG_DIR/simulator-runtimes.txt"
+            exit 1
+          fi
+
+          SIM_UDID="$(printf '%s' "$SELECTED" | cut -f1)"
+          SIM_NAME="$(printf '%s' "$SELECTED" | cut -f2)"
+          SIM_OS="$(printf '%s'   "$SELECTED" | cut -f3)"
+
+          echo "선택: $SIM_NAME ($SIM_OS)  UDID=$SIM_UDID"
+          {
+            echo "sim_udid=$SIM_UDID"
+            echo "sim_name=$SIM_NAME"
+            echo "sim_os=$SIM_OS"
+          } >> "$GITHUB_OUTPUT"
+
+      # ── 6(AC-2). Simulator 대상 build ──────────────────────────────
+      - name: 'AC-2 — Simulator 대상 build'
+        id: ac2
+        run: |
+          set -uo pipefail
+
+          echo "::group::xcodebuild build"
+          xcodebuild build \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.sim_udid }}" \
+            -resultBundlePath "$LOG_DIR/build.xcresult" \
+            2>&1 | tee "$LOG_DIR/ac2-build.log"
+          STATUS=${PIPESTATUS[0]}
+          echo "::endgroup::"
+
+          if [ "$STATUS" -ne 0 ] || ! grep -q "BUILD SUCCEEDED" "$LOG_DIR/ac2-build.log"; then
+            echo "::group::빌드 오류"
+            grep -E "(error:|BUILD FAILED)" "$LOG_DIR/ac2-build.log" | tail -40 || true
+            echo "::endgroup::"
+            echo "::error::AC-2 실패 — Simulator 빌드 실패 (exit $STATUS)"
+            exit 1
+          fi
+          echo "AC-2 통과 — ** BUILD SUCCEEDED **"
+
+      # ── 7(AC-6). XCTest 실행 ───────────────────────────────────────
+      - name: 'AC-6 — Unit Test (XCTest)'
+        id: ac6
+        run: |
+          set -uo pipefail
+
+          echo "::group::xcodebuild test"
+          xcodebuild test \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.sim_udid }}" \
+            -resultBundlePath "$LOG_DIR/test.xcresult" \
+            2>&1 | tee "$LOG_DIR/ac6-test.log"
+          STATUS=${PIPESTATUS[0]}
+          echo "::endgroup::"
+
+          echo "::group::테스트 케이스 결과"
+          grep -E "Test Case .* (passed|failed)" "$LOG_DIR/ac6-test.log" || echo "(테스트 케이스 줄 없음)"
+          echo "::endgroup::"
+
+          if [ "$STATUS" -ne 0 ] || ! grep -q "TEST SUCCEEDED" "$LOG_DIR/ac6-test.log"; then
+            echo "::group::테스트 실패 상세"
+            grep -E "(error:|Test Case .* failed|XCTAssert|failed to)" "$LOG_DIR/ac6-test.log" | tail -40 || true
+            echo "::endgroup::"
+            echo "::error::AC-6 실패 — Unit Test 실패 (exit $STATUS)"
+            exit 1
+          fi
+
+          PASSED="$(grep -cE 'Test Case .* passed' "$LOG_DIR/ac6-test.log" || true)"
+          echo "passed_count=${PASSED}" >> "$GITHUB_OUTPUT"
+          echo "AC-6 통과 — ** TEST SUCCEEDED ** (통과 케이스 ${PASSED}개)"
+
+      # ── 8. Sprint 0 보고서용 결과 기록 ─────────────────────────────
+      - name: Sprint 0 검증 결과 요약
+        if: always()
+        run: |
+          set -uo pipefail
+          {
+            echo "# Sprint 0 검증 결과"
+            echo
+            echo "| 항목 | 값 |"
+            echo "|---|---|"
+            echo "| Runner | \`macos-latest\` (macOS ${{ steps.xcode.outputs.macos_version }}) |"
+            echo "| Xcode | ${{ steps.xcode.outputs.xcode_full }} |"
+            echo "| XcodeGen | $(cat "$LOG_DIR/xcodegen-version.txt" 2>/dev/null | tr -d '\n' || echo 'n/a') |"
+            echo "| 프로젝트 생성 | \`ios/project.yml\` 기준 XcodeGen 재생성 (D-006) |"
+            echo "| Simulator | ${{ steps.sim.outputs.sim_name }} (${{ steps.sim.outputs.sim_os }}) |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo
+            echo "## Acceptance Criteria"
+            echo
+            echo "| # | 기준 | 결과 |"
+            echo "|---|---|---|"
+            echo "| AC-1 | Xcode 에서 프로젝트 열기 | ${{ steps.ac1.outcome == 'success' && '✅ 통과' || '❌ 실패' }} |"
+            echo "| AC-2 | iOS Simulator 대상 build | ${{ steps.ac2.outcome == 'success' && '✅ 통과' || '❌ 실패' }} |"
+            echo "| AC-6 | Unit Test (XCTest) | ${{ steps.ac6.outcome == 'success' && '✅ 통과' || '❌ 실패' }} |"
+            echo
+
+            if [ -f "$LOG_DIR/ac6-test.log" ]; then
+              echo "## 테스트 케이스"
+              echo
+              echo '```'
+              grep -E "Test Case .* (passed|failed)" "$LOG_DIR/ac6-test.log" | sed 's/^[[:space:]]*//' || echo "(없음)"
+              echo '```'
+              echo
+            fi
+
+            if [ "${{ job.status }}" != "success" ]; then
+              echo "## 실패 로그 발췌"
+              echo
+              echo "전체 로그는 \`sprint0-verify-logs-${{ github.run_number }}\` artifact 참고."
+              echo
+              echo '```'
+              grep -hE "error:" "$LOG_DIR"/*.log 2>/dev/null | tail -30 || echo "(error: 줄 없음)"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # 실패 시 전체 로그를 저장한다. 성공 시에도 저장해 Sprint 0 보고서의
+      # 근거로 남긴다(지시 8).
+      - name: 로그 artifact 업로드
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprint0-verify-logs-${{ github.run_number }}
+          path: ci-logs/**
+          retention-days: 30
+          if-no-files-found: warn

@@ -71,14 +71,15 @@ Product Owner 결정으로 **AC-6(Unit Test 성공)이 추가**되어 총 6개�
 
 ### Sprint 0 DONE 조건
 
-Mac에서 아래를 실행해 3개 항목이 모두 통과해야 한다.
+**GitHub Actions macOS CI가 AC-1 / AC-2 / AC-6을 모두 통과해야 한다.** (D-008, 2026-08-25 재검토)
 
-```bash
-./scripts/mac_verify.sh
-```
+워크플로: `.github/workflows/ios-sprint0-verify.yml` (`macos-latest`)
+`ios/project.yml` 기준으로 XcodeGen 재생성한 프로젝트를 검증 대상으로 삼는다 (D-006).
 
-절차와 수동 대안은 `README.md`의 「Mac 검증 절차」 참고.
-XcodeGen이 있으면 `ios/project.yml` 기준으로 재생성한 프로젝트를 검증 대상으로 삼는다 (D-006).
+Mac을 쓸 수 있는 경우 `./scripts/mac_verify.sh` 로 동일한 3개 항목을 로컬 검증할 수도 있다.
+(README 「Mac 검증 절차」 참고 — CI와 병행 가능하며 실기기 검증 단계에서도 사용한다.)
+
+**CI가 성공하기 전 Sprint 1은 시작하지 않는다.**
 
 ### 완료된 후속 작업
 
@@ -87,7 +88,7 @@ XcodeGen이 있으면 `ios/project.yml` 기준으로 재생성한 프로젝트�
 
 ### 남은 항목
 
-Mac 검증 3종(AC-1 / AC-2 / AC-6)이 유일한 잔여 항목이다.
+CI 검증 3종(AC-1 / AC-2 / AC-6)이 유일한 잔여 항목이다.
 
 ---
 
@@ -397,6 +398,6 @@ OpenAI Key를 앱에 넣지 않는 서버 구조를 만든다.
 | ID | 내용 | 발견 Sprint | 상태 |
 |---|---|---|---|
 | B-001 | 저장소 분리 — 「쉼」 iOS를 `musi0905-cloud/shim-ios`로 분리 | Sprint 0 | ✅ **완료** (2026-08-25, D-002) |
-| B-002 | GitHub Actions macOS CI 도입 (Simulator 빌드·테스트 자동 검증) | Sprint 0 | 📌 **Backlog 유지** — MVP 초기 기능 안정화 이후 도입 (D-008) |
+| B-002 | GitHub Actions macOS CI 도입 | Sprint 0 | ✅ **완료** — Sprint 0 검증 수단으로 도입 (2026-08-25, D-008) |
 | B-003 | App Icon 실제 에셋 제작 (현재 빈 AppIcon 슬롯) | Sprint 0 | 대기 — 디자인 필요 |
 | B-004 | 저장소 라이선스 결정 | Sprint 0 | 대기 — Product Owner 결정 필요 |
