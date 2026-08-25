@@ -17,8 +17,8 @@
 |---|---|---|
 | 0 | 개발 환경 및 저장소 기초 | ✅ **DONE** (2026-08-25) — CI가 AC 6개 전부 충족 |
 | 1 | Foundation & RestPlan | ✅ **DONE** (2026-08-25) — CI 통과 |
-| 2 | Timer Engine | READY |
-| 3 | Audio PoC | TODO |
+| 2 | Timer Engine | ✅ **DONE** (2026-08-25) — CI 통과 |
+| 3 | Audio PoC | READY — Product Owner 승인 대기 |
 | 4 | Brightness & Minimal Screen | TODO |
 | 5 | Local Notification | TODO |
 | 6 | RestPlanExecutor 통합 | TODO |
@@ -237,7 +237,7 @@ Sprint 1 코드와 무관했다. 재실행으로 넘기지 않고 원인을 고�
 
 ## Sprint 2 — Timer Engine
 
-**상태: READY** — Product Owner 승인 대기
+**상태: DONE** (2026-08-25)
 
 ### 목표
 백그라운드 전환에도 시간 오차가 누적되지 않는 쉼 타이머를 만든다.
@@ -252,17 +252,119 @@ Sprint 1 코드와 무관했다. 재실행으로 넘기지 않고 원인을 고�
 - Timer unit tests
 - RestSessionView 연동
 
-### Acceptance Criteria
-- 10분 계획을 시작할 수 있다.
-- 앱을 백그라운드에 두었다 돌아와도 남은 시간이 실제 경과시간 기준으로 맞다.
-- 중복 타이머가 생성되지 않는다.
-- 테스트가 통과한다.
+### Acceptance Criteria — 전부 충족 ✅
+
+| # | 기준 | 결과 |
+|---|---|---|
+| 1 | 10분 계획을 시작할 수 있다 | ✅ `testTenMinutePlanStartsAtSixHundredSeconds` — 600초 |
+| 2 | 백그라운드에 두었다 돌아와도 남은 시간이 실제 경과시간 기준으로 맞다 | ✅ `testForegroundReturnRecalculatesRemaining` / `testReturningFromBackgroundRecalculatesRemaining` |
+| 3 | 중복 타이머가 생성되지 않는다 | ✅ `testDuplicateStartIsIgnored` — `scheduler.startCount == 1` |
+| 4 | 테스트가 통과한다 | ✅ CI 64/64 |
+
+### Product Owner 추가 요구사항 이행
+
+| # | 요구 | 이행 |
+|---|---|---|
+| 1 | Pause / Resume 미구현 | ✅ `finish()` 를 `private` 으로 두어 사용자 종료 경로 제거 (D-014) |
+| 2 | tick 누적 금지 | ✅ `remaining = max(0, endsAt - now)` · `testTickCountDoesNotAffectRemaining` (D-015) |
+| 3 | Clock / Date provider 주입 | ✅ `Clock` + `TickScheduler` 주입 (D-016) |
+| 4 | 중복 timer 방지 | ✅ Service 의 `isRunning` 가드 + Coordinator 의 `state.canStart` |
+| 5 | background 매초 실행 미보장 | ✅ `Task` 기반 스케줄러는 suspend 시 멈춘다. 복귀 시 `refresh()` 로 재계산 |
+| 6 | 프로세스 종료 후 복원 미구현 | ✅ 범위 밖. **B-007** 로 분리 |
+| 7 | 임시 종료 버튼 제거 | ✅ 제거. "쉼 그만하기" 만 남기고 `cancelled` 로 처리 |
+| 8 | TimerService 는 UI 를 모른다 | ✅ `Foundation` 만 import. `verify_repo.py` 가 `Services/` 의 UI import 차단 |
+| 9 | 최소 테스트 9종 | ✅ 아래 표 |
+| 10 | 범위 미확대 | ✅ Audio / Brightness / Notification / OpenAI / Location / Watch 미구현 |
+
+### 요구된 최소 테스트 9종
+
+| 요구 항목 | 테스트 |
+|---|---|
+| 10분 시작 시 600초 | `testTenMinutePlanStartsAtSixHundredSeconds` |
+| 시간 경과에 따른 정확한 remaining | `testRemainingReflectsElapsedTime` |
+| 종료 시 0 미만으로 내려가지 않음 | `testRemainingNeverGoesBelowZero` |
+| 종료 시 completion 1회만 발생 | `testFinishFiresOnlyOnce` |
+| background 후 복귀 보정 | `testForegroundReturnRecalculatesRemaining` |
+| 종료시간 이후 foreground 복귀 시 즉시 finish | `testForegroundReturnAfterEndFinishesImmediately` |
+| 중복 start 방지 | `testDuplicateStartIsIgnored` |
+| cancel 이후 completion 발생하지 않음 | `testNoFinishAfterCancel` |
+| 재사용 가능한 새 session 시작 | `testCanStartNewSessionAfterFinish` / `AfterCancel` |
+
+### CI 검증 결과 기록
+
+**Run**: [#6](https://github.com/musi0905-cloud/shim-ios/actions/runs/32796901669) · conclusion `success` · 2026-08-25 01:19 UTC
+**Commit**: `d90acfc08aa036d92e9c4757ed772273aac01e02`
+**환경**: macos-latest / macOS 26.5.2 (arm64) · Xcode 26.6 · iPhone Air (iOS 26.5) · XcodeGen 재생성
+**Artifact**: `sprint0-verify-logs-6` — 175개 파일, 174 KB
+
+```
+** BUILD SUCCEEDED **
+** TEST SUCCEEDED **   Executed 64 tests, with 0 failures (0 unexpected)
+```
+
+| 테스트 파일 | 개수 |
+|---|---:|
+| `RestTimerServiceTests` | 17 |
+| `RestPlanDecodingTests` | 12 |
+| `RestPlanValidatorTests` | 12 |
+| `RestFlowCoordinatorTests` | 11 |
+| `RestFlowTimerIntegrationTests` | 10 |
+| `ShimSmokeTests` | 2 |
+| **합계** | **64** |
+
+전체 타이머 테스트가 1초 안에 끝난다. 주입한 시계 덕분에 10분짜리 쉼의 종료를
+검증하는 데 10분이 걸리지 않는다.
+
+### 파일 변경 기록
+
+`./scripts/sprint_files.sh a7f08a6 d90acfc` 산출값이다.
+범위는 구현 커밋까지이며, 이 DONE 기록 커밋은 포함하지 않는다.
+
+| 구분 | 개수 |
+|---|---:|
+| 생성 | 6 |
+| 수정 | 7 |
+| 삭제 | 0 |
+
+**생성 (6)**
+
+| 파일 | 역할 |
+|---|---|
+| `ios/Shim/Services/Timer/Clock.swift` | 주입 가능한 시계 |
+| `ios/Shim/Services/Timer/TickScheduler.swift` | 화면 갱신 신호 |
+| `ios/Shim/Services/Timer/RestTimerService.swift` | `endsAt` 기반 타이머 |
+| `ios/ShimTests/TestDoubles.swift` | `MutableClock` / `ManualTickScheduler` |
+| `ios/ShimTests/RestTimerServiceTests.swift` | 테스트 17 |
+| `ios/ShimTests/RestFlowTimerIntegrationTests.swift` | 테스트 10 |
+
+**수정 (7)**
+
+| 파일 | 이유 |
+|---|---|
+| `ios/Shim/Features/RestFlowCoordinator.swift` | 타이머 연결, `finish()` private 화, foreground 복귀 |
+| `ios/Shim/Features/RestSession/RestSessionView.swift` | 임시 버튼 제거, 남은 시간 표시 |
+| `ios/Shim/RootView.swift` | `scenePhase` 관찰 |
+| `ios/ShimTests/RestFlowCoordinatorTests.swift` | 자동 종료 경로로 전환 |
+| `scripts/verify_repo.py` | 범위 가드 갱신, `Services/` UI import 차단 |
+| `docs/DECISIONS.md` | D-014~D-016 |
+| `docs/SPRINTS.md` | Sprint 2 기록 |
+
+### 이 Sprint 의 설계 결정
+
+- **D-014** Pause / Resume 을 두지 않는다. `finish()` 는 `private`
+- **D-015** `endsAt` 기준 계산. tick 누적 금지. background 는 재계산으로 해결
+- **D-016** `Clock` 과 `TickScheduler` 를 주입한다
+
+### Sprint 3 으로 넘기는 것
+
+`RestSessionView` 의 남은 시간은 현재 1초 주기로 갱신된다.
+`screenMode` 가 `.dark` 일 때의 화면 처리와 밝기 제어는 Sprint 4 다.
 
 ---
 
 ## Sprint 3 — Audio PoC
 
-**상태: TODO**
+**상태: READY** — Product Owner 승인 대기
 
 ### 목표
 쉼 시작 시 로컬 오디오가 자동 재생되고 종료 시 확실히 정리되게 한다.

@@ -226,9 +226,19 @@ CI 결과를 확인하지 않은 상태에서 빌드·테스트가 통과했다�
 |---|---|---|
 | 0 — 개발 환경 및 저장소 기초 | ✅ DONE | [Run #1](https://github.com/musi0905-cloud/shim-ios/actions/runs/32792825752) |
 | 1 — Foundation & RestPlan | ✅ DONE | [Run #4](https://github.com/musi0905-cloud/shim-ios/actions/runs/32794940622) — 37 tests |
-| 2 — Timer Engine | READY | Product Owner 승인 대기 |
+| 2 — Timer Engine | ✅ DONE | [Run #6](https://github.com/musi0905-cloud/shim-ios/actions/runs/32796901669) — 64 tests |
+| 3 — Audio PoC | READY | Product Owner 승인 대기 |
 
 **다음 Sprint 는 Product Owner 승인 후 시작한다.** (운영규칙 §3)
+
+### 쉼 타이머의 규칙 (Sprint 2)
+
+- 남은 시간은 `endsAt` 과 현재 시각의 차이다. **tick 을 누적하지 않는다.** (D-015)
+- **Pause / Resume 은 없다.** 허용되는 흐름은 두 가지뿐이다. (D-014)
+  `Start → Running → Automatic Finish` 또는 `Start → Running → User Cancel`
+  `RestFlowCoordinator.finish()` 는 `private` 이며 타이머만 호출한다.
+- background 에서 매초 실행을 보장하려 하지 않는다. 복귀 시 재계산한다.
+- 앱 프로세스 종료 후 복원은 아직 없다 (B-007).
 
 ### RestPlan 은 API 계약이다
 
