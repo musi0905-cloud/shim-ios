@@ -5,16 +5,16 @@
 >
 > 「쉼」은 **추천 앱이 아니라 실행 앱**이다. 사용자를 앱에 오래 붙잡지 않는다.
 
-**현재 상태: Sprint 0 — 개발 환경 및 저장소 기초 ✅ DONE (2026-08-25)**
+**현재 상태: Sprint 1 — Foundation & RestPlan ✅ DONE (2026-08-25)**
 
 > 이 저장소는 `musi0905-cloud/App`에서 「쉼」 관련 파일만 분리해 만들었다 (`docs/DECISIONS.md` D-002).
 > 무관한 Google Apps Script 프로젝트는 `App` 저장소에 그대로 남아 있다.
 
 [![Sprint 0 Verify (iOS)](https://github.com/musi0905-cloud/shim-ios/actions/workflows/ios-sprint0-verify.yml/badge.svg)](https://github.com/musi0905-cloud/shim-ios/actions/workflows/ios-sprint0-verify.yml)
 
-CI가 Acceptance Criteria 6개를 모두 충족했다 ([Run #1](https://github.com/musi0905-cloud/shim-ios/actions/runs/32792825752) — Xcode 26.6 / iPhone Air iOS 26.5).
+Sprint 0·1 모두 CI 검증을 통과했다 ([Run #4](https://github.com/musi0905-cloud/shim-ios/actions/runs/32794940622) — `BUILD SUCCEEDED` / `TEST SUCCEEDED` 37 tests).
 상세 결과는 [`docs/SPRINTS.md`](docs/SPRINTS.md)「CI 검증 결과 기록」참고.
-**Sprint 1은 Product Owner 승인 후 시작한다.**
+**Sprint 2(Timer Engine)는 Product Owner 승인 후 시작한다.**
 
 ---
 

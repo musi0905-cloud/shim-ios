@@ -16,8 +16,8 @@
 | Sprint | 이름 | 상태 |
 |---|---|---|
 | 0 | 개발 환경 및 저장소 기초 | ✅ **DONE** (2026-08-25) — CI가 AC 6개 전부 충족 |
-| 1 | Foundation & RestPlan | TODO |
-| 2 | Timer Engine | TODO |
+| 1 | Foundation & RestPlan | ✅ **DONE** (2026-08-25) — CI 통과 |
+| 2 | Timer Engine | READY |
 | 3 | Audio PoC | TODO |
 | 4 | Brightness & Minimal Screen | TODO |
 | 5 | Local Notification | TODO |
@@ -114,7 +114,7 @@ Executed 2 tests, with 0 failures (0 unexpected) in 0.005 seconds
 
 ## Sprint 1 — Foundation & RestPlan
 
-**상태: TODO**
+**상태: DONE** (2026-08-25)
 
 ### 목표
 쉼 실행을 표현하는 Domain 모델과 최소 화면 뼈대를 만든다.
@@ -126,18 +126,60 @@ Executed 2 tests, with 0 failures (0 unexpected) in 0.005 seconds
 - 기본 Navigation 흐름
 - RestPlan JSON decoding test
 
-### Acceptance Criteria
-- Mock RestPlan을 생성할 수 있다.
-- JSON에서 RestPlan decoding이 가능하다.
-- Home → RestSession → RestResult → Home 흐름이 동작한다.
-- 아직 실제 오디오, 타이머, 밝기 기능은 붙이지 않는다.
-- 빌드 및 관련 테스트가 성공한다.
+### Acceptance Criteria — 전부 충족 ✅
+
+| # | 기준 | 결과 |
+|---|---|---|
+| 1 | Mock RestPlan 을 생성할 수 있다 | ✅ `MockRestPlanFactory.defaultPlan()` / `shortPlan(minutes:)` |
+| 2 | JSON 에서 RestPlan decoding 이 가능하다 | ✅ `docs/PRODUCT.md` §5 예시 JSON 그대로 디코딩 |
+| 3 | Home → RestSession → RestResult → Home 흐름이 동작한다 | ✅ `RestFlowCoordinator` — 유닛 테스트 11개로 검증 |
+| 4 | 아직 실제 오디오·타이머·밝기 기능은 붙이지 않는다 | ✅ Service 미생성 — `verify_repo.py` 범위 가드로 강제 |
+| 5 | 빌드 및 관련 테스트가 성공한다 | ✅ CI — `BUILD SUCCEEDED` / `TEST SUCCEEDED` 37/37 |
+
+### CI 검증 결과 기록
+
+**Run**: [#4](https://github.com/musi0905-cloud/shim-ios/actions/runs/32794940622) · conclusion `success` · 2026-08-25 00:46–00:49 UTC
+**Commit**: `bbdf8dec36be5c96dcbeaa202a8facc71d113500`
+**환경**: macos-latest / macOS 26.5.2 (arm64) · Xcode 26.6 · iPhone Air (iOS 26.5) · XcodeGen 재생성 (D-006)
+**Artifact**: `sprint0-verify-logs-4` — 121개 파일, 134 KB
+
+```
+** BUILD SUCCEEDED **
+** TEST SUCCEEDED **   37 tests, 0 failures
+```
+
+| 테스트 파일 | 개수 | 범위 |
+|---|---:|---|
+| `RestPlanDecodingTests` | 12 | PRODUCT.md 예시 JSON, 선택 필드 생략, 알 수 없는 enum 2종, 필수 필드 누락, 타입 불일치, 깨진 JSON, 빈 데이터, 왕복, snake_case 키, 파생값 |
+| `RestPlanValidatorTests` | 12 | 통과, 경계값, brightness clamp 상·하한, 안내 문장 절삭, 다중 보정, duration 거부 3종, decoding→validation 전체 경로 |
+| `RestFlowCoordinatorTests` | 11 | 전체 흐름, 취소 흐름, endCheckin 생략, 중복 start 차단, 재시작, idle no-op, 검증 실패, 복구, 보정 전달, 상태 규칙 |
+| `ShimSmokeTests` | 2 | 테스트 타깃 구성 |
+| **합계** | **37** | |
+
+### 첫 실행 실패와 원인 (Run #3)
+
+Sprint 1 코드를 처음 push 했을 때 CI 가 Swift 컴파일 전에 실패했다.
+원인은 **워크플로의 `xcodebuild -version | head -1`** 이 일으킨 SIGPIPE abort 로,
+Sprint 1 코드와 무관했다. 재실행으로 넘기지 않고 원인을 고쳤다 — **D-013**.
+
+### 이 Sprint 의 설계 결정
+
+- **D-010** RestPlan 스키마는 `docs/PRODUCT.md` §5 의 snake_case JSON 계약을 따른다
+- **D-011** enum 어휘는 명세에 등장하는 값만 정의 — `RestType` 어휘 확정은 PO 결정 대기
+- **D-012** `RestPlanValidator` 를 Sprint 6 에서 Sprint 1 로 앞당김
+- **D-013** CI 에서 Apple CLI 출력을 `head` 로 자르지 않는다
+
+### Sprint 2 로 넘기는 항목
+
+- `RestSessionView` 의 "쉼 종료 (임시)" 버튼 — 타이머가 없어 정상 종료 경로를 확인하려고 둔 것이다.
+  `TimerService` 가 만료를 알리면 제거한다.
+- 남은 시간 표시는 현재 계획된 길이를 그대로 보여준다. 카운트다운이 아니다.
 
 ---
 
 ## Sprint 2 — Timer Engine
 
-**상태: TODO**
+**상태: READY** — Product Owner 승인 대기
 
 ### 목표
 백그라운드 전환에도 시간 오차가 누적되지 않는 쉼 타이머를 만든다.

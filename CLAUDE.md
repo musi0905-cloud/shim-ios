@@ -220,23 +220,24 @@ Swift 코드와 Xcode 프로젝트는 작성 가능하지만, **"빌드 성공"�
 빌드·테스트 검증은 **GitHub Actions macOS runner** 에서 수행한다. (D-001, D-008)
 CI 결과를 확인하지 않은 상태에서 빌드·테스트가 통과했다고 보고하지 않는다.
 
-### Sprint 0 상태 — DONE (2026-08-25)
+### Sprint 진행 상태 (2026-08-25)
 
-CI가 Acceptance Criteria 6개를 모두 충족했다.
-
-| AC | 항목 | 결과 |
+| Sprint | 상태 | 검증 |
 |---|---|---|
-| AC-1 | Xcode에서 프로젝트 열기 | ✅ |
-| AC-2 | iOS Simulator 대상 build | ✅ `** BUILD SUCCEEDED **` |
-| AC-3 | 저장소에 비밀정보 없음 | ✅ |
-| AC-4 | CLAUDE.md 운영규칙 포함 | ✅ |
-| AC-5 | README에 구조·빌드 방법 기록 | ✅ |
-| AC-6 | Unit Test 성공 | ✅ `** TEST SUCCEEDED **` (2/2) |
+| 0 — 개발 환경 및 저장소 기초 | ✅ DONE | [Run #1](https://github.com/musi0905-cloud/shim-ios/actions/runs/32792825752) |
+| 1 — Foundation & RestPlan | ✅ DONE | [Run #4](https://github.com/musi0905-cloud/shim-ios/actions/runs/32794940622) — 37 tests |
+| 2 — Timer Engine | READY | Product Owner 승인 대기 |
 
-검증: [Run #1](https://github.com/musi0905-cloud/shim-ios/actions/runs/32792825752) — Xcode 26.6 / iPhone Air (iOS 26.5)
-상세 기록은 `docs/SPRINTS.md`「CI 검증 결과 기록」.
+**다음 Sprint 는 Product Owner 승인 후 시작한다.** (운영규칙 §3)
 
-**Sprint 1은 Product Owner 승인 후 시작한다.** (운영규칙 §3)
+### RestPlan 은 API 계약이다
+
+`Models/RestPlan.swift` 는 AI → Backend → 앱 → 실행 계층을 잇는 계약이다.
+필드를 바꾸면 Backend JSON Schema 와 `docs/PRODUCT.md` §5, `docs/IOS_SPEC.md` §5 를 함께 갱신한다.
+자세한 내용은 D-010 / D-011 참고.
+
+실행 파이프라인: `AI JSON → decoding → validation → RestEngine → Execution Layer`
+실행 계층은 `RestPlan` 이 아니라 `ValidatedRestPlan` 만 받는다.
 
 ### 이후 Sprint의 검증 방식
 
