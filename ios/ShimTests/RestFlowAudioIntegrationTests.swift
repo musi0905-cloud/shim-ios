@@ -28,7 +28,9 @@ final class RestFlowAudioIntegrationTests: XCTestCase {
         audio = SpyAudioService()
         coordinator = RestFlowCoordinator(
             timer: DefaultRestTimerService(clock: clock, scheduler: scheduler),
-            audio: audio
+            audio: audio,
+            history: InMemoryRestHistoryStore(),
+            clock: clock
         )
     }
 
@@ -97,7 +99,7 @@ final class RestFlowAudioIntegrationTests: XCTestCase {
 
         coordinator.cancel()
 
-        XCTAssertEqual(coordinator.state, .cancelled)
+        XCTAssertEqual(coordinator.state, .idle, "취소 후 즉시 홈으로 돌아간다 (D-023)")
         XCTAssertEqual(audio.stopCallCount, 1)
         XCTAssertFalse(audio.isPlaying)
     }

@@ -7,15 +7,16 @@
 //  운영규칙 §6 — "상태는 단일 소스에서 관리"
 //  docs/IOS_SPEC.md §9 — "상태 전이는 한 곳에서 관리한다."
 //
-//  현재 범위 (Sprint 3):
-//    화면 흐름, 상태 전이, RestTimerService, AudioService 연결을 담당한다.
-//    밝기·알림은 아직 붙이지 않는다.
+//  현재 범위 (Sprint 7):
+//    화면 흐름, 상태 전이, RestTimerService, AudioService,
+//    그리고 쉼 기록 저장을 담당한다. 밝기·알림은 아직 붙이지 않는다.
 //    Sprint 6 에서 RestPlanExecutor 가 Service 들을 묶으면 이 타입은
 //    Executor 를 호출하고 상태만 반영하는 역할로 남는다.
 //
 //  의존 방향:
 //      RestSessionView → RestFlowCoordinator → RestTimerService
 //                                            → AudioService → AVFoundation
+//                                            → RestHistoryStore
 //
 //  이 타입은 SwiftUI 외의 iOS 시스템 프레임워크를 import 하지 않는다.
 //  덕분에 Simulator 에서 유닛 테스트로 흐름 전체를 검증할 수 있다.
@@ -66,11 +67,29 @@ final class RestFlowCoordinator: ObservableObject {
 
     private let timer: RestTimerService
     private let audio: AudioService
+    private let history: RestHistoryStore
+    private let clock: Clock
     private var audioTask: Task<Void, Never>?
 
-    init(timer: RestTimerService? = nil, audio: AudioService? = nil) {
+    /// 이번 세션이 시작된 시각. 실제 지속시간 계산에 쓴다.
+    private var sessionStartedAt: Date?
+
+    /// 결과 화면에서 응답을 기다리는 기록.
+    ///
+    /// 세션이 끝날 때 만들어 두고, 응답이 정해지면 한 번만 저장한다.
+    /// 저장 후 수정하는 경로를 두지 않기 위한 장치다.
+    private var pendingEntry: RestHistoryEntry?
+
+    init(
+        timer: RestTimerService? = nil,
+        audio: AudioService? = nil,
+        history: RestHistoryStore? = nil,
+        clock: Clock = SystemClock()
+    ) {
         self.timer = timer ?? DefaultRestTimerService()
         self.audio = audio ?? DefaultAudioService()
+        self.history = history ?? UserDefaultsRestHistoryStore()
+        self.clock = clock
         bindTimer()
     }
 
@@ -107,6 +126,7 @@ final class RestFlowCoordinator: ObservableObject {
             // Sprint 6 에서 RestPlanExecutor.start(plan) 이 이 자리에 들어가
             // 오디오·밝기·알림까지 함께 시작한다. 지금은 타이머만 붙인다.
             state = .running
+            sessionStartedAt = clock.now
             timer.start(duration: TimeInterval(validated.durationSeconds))
             startAudio(mode: validated.plan.audio)
             path = [.session]
@@ -132,13 +152,29 @@ final class RestFlowCoordinator: ObservableObject {
         stopAudio()
         finishReason = .completed
         state = .completed
-        routeAfterFinish()
+
+        let entry = makeEntry(outcome: .completed)
+
+        if activePlan?.plan.endCheckin == true {
+            // 응답을 물은 뒤 한 번만 저장한다.
+            pendingEntry = entry
+            path = [.session, .result]
+        } else {
+            // 묻지 않기로 한 계획이다. 응답 없이 바로 저장하고 홈으로 보낸다.
+            // 제품 원칙 — "쉼이 끝나면 사용자를 현실로 돌려보낸다." (PRODUCT.md §1)
+            history.save(entry)
+            returnHome()
+        }
     }
 
     /// 쉼을 중간에 취소한다.
     ///
     /// docs/IOS_SPEC.md §6 — cancel 은 finish(reason: cancelled) 와 같은
-    /// 정리 규칙을 따른다. Sprint 1 에는 정리할 자원이 없으므로 상태만 바꾼다.
+    /// 정리 규칙을 따른다. 타이머와 오디오를 모두 정리한다.
+    ///
+    /// **결과 화면으로 보내지 않는다.** 그만두겠다고 한 사람에게
+    /// "조금 나아졌나요?" 를 묻는 것은 어색하다 (D-023).
+    /// 기록은 `cancelled` 로 즉시 남기고 홈으로 돌아간다.
     func cancel() {
         guard state == .running else { return }
         state = .finishing
@@ -147,18 +183,36 @@ final class RestFlowCoordinator: ObservableObject {
         stopAudio()
         finishReason = .cancelled
         state = .cancelled
-        routeAfterFinish()
+
+        history.save(makeEntry(outcome: .cancelled))
+        returnHome()
+    }
+
+    /// 결과 화면에서 사용자가 응답을 골랐다.
+    ///
+    /// docs/IOS_SPEC.md §8.3 — "선택 후 즉시 홈으로 복귀한다."
+    func submitFeedback(_ feedback: RestFeedback) {
+        pendingEntry = pendingEntry?.withFeedback(feedback)
+        returnHome()
     }
 
     /// 결과 화면에서 홈으로 돌아온다.
     ///
     /// docs/IOS_SPEC.md §8.3 — "선택 후 즉시 홈으로 복귀한다."
     func returnHome() {
+        // 응답 없이 화면을 벗어나도 기록은 남긴다.
+        // 사용자가 결과 화면을 그냥 빠져나가면 feedback 은 nil 이다.
+        if let entry = pendingEntry {
+            history.save(entry)
+            pendingEntry = nil
+        }
+
         path = []
         activePlan = nil
         finishReason = nil
         remainingSeconds = 0
         audioError = nil
+        sessionStartedAt = nil
         state = .idle
     }
 
@@ -225,16 +279,24 @@ final class RestFlowCoordinator: ObservableObject {
 
     // MARK: - 내부
 
-    /// 종료 후 결과 화면으로 갈지, 바로 홈으로 갈지 결정한다.
+    /// 이번 세션의 기록을 만든다.
     ///
-    /// `endCheckin` 이 false 면 사용자를 붙잡지 않고 곧장 홈으로 보낸다.
-    /// 제품 원칙 — "쉼이 끝나면 사용자를 현실로 돌려보낸다." (PRODUCT.md §1)
-    private func routeAfterFinish() {
-        if activePlan?.plan.endCheckin == true {
-            path = [.session, .result]
-        } else {
-            returnHome()
-        }
+    /// 실제 지속시간은 `startedAt` 과 지금 시각의 차이에서 계산되며
+    /// 음수가 되지 않는다 (`RestHistoryEntry.elapsedSeconds`).
+    private func makeEntry(outcome: RestHistoryEntry.Outcome) -> RestHistoryEntry {
+        let plan = activePlan?.plan
+        let startedAt = sessionStartedAt ?? clock.now
+
+        return RestHistoryEntry(
+            planID: plan?.id ?? "",
+            startedAt: startedAt,
+            endedAt: clock.now,
+            plannedDurationMinutes: plan?.durationMinutes ?? 0,
+            restType: plan?.restType ?? .environmentReset,
+            audio: plan?.audio ?? .silence,
+            movement: plan?.movement ?? .none,
+            outcome: outcome
+        )
     }
 
     private static func message(for error: Error) -> String {

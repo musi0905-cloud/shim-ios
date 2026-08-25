@@ -990,14 +990,120 @@ Sprint 3 의 `IMPLEMENTED / DEVICE VERIFICATION BLOCKED` 는
 Mac 을 확보하거나, `docs/DEVICE_VERIFICATION.md` 절차를 실행할 수 있는
 다른 경로가 생기면 **Sprint 3 Gate B → 4 → 5** 를 먼저 처리한다.
 
-Mac 없이 iPhone 에 설치하는 경로로 **TestFlight 배포**가 있다 — **B-010**.
-CI 의 macOS runner 가 빌드해 App Store Connect 에 올리면 PO 는 iPhone 의
-TestFlight 앱으로 설치할 수 있다. 다만 Apple Developer Program(연 $99)과
-서명 인증서·API Key 관리가 필요하다. 별도 Sprint 규모의 작업이므로
-Product Owner 결정 사항으로 남긴다.
+Mac 없이 iPhone 에 설치하는 경로로 **TestFlight 배포**가 유력하다 — **B-010**.
+클라우드 macOS 빌드(GitHub Actions macOS runner 또는 Xcode Cloud)가 archive·
+서명 후 App Store Connect 에 올리면 PO 는 iPhone 의 TestFlight 앱으로 설치할 수 있다.
+
+```
+Claude Code (Linux) → GitHub → macOS CI → Archive + Signing
+                                        → App Store Connect → TestFlight → iPhone
+```
+
+다만 Apple Developer Program(연 US$99)과 서명 인증서·API Key 관리가 필요하다.
+별도 Sprint 규모의 작업이므로 Product Owner 결정 사항으로 남긴다.
+
+> 정정: 이전 보고에서 이를 "Mac 없이 설치하는 유일한 경로" 라고 표현했으나
+> 과장이었다. Mac 을 빌리거나 클라우드 Mac 을 임대하는 경로도 있다.
+> 다만 현재 상황에서 가장 현실적인 안인 것은 맞다.
 
 ### 운영 원칙은 그대로다
 
 재배치해도 한 번에 하나의 Sprint 만 진행한다.
 CI build/test 성공 후 DONE 처리한다. (운영규칙 §3)
+
+---
+
+## D-022. 쉼 기록에는 자유 텍스트를 담을 필드를 만들지 않는다
+
+- **Sprint**: 7
+- **상태**: 확정 (Product Owner 지시, 2026-08-25)
+- **문제 구분**: D
+
+### 결정
+
+`docs/SPRINTS.md` Sprint 7 AC — "원본 자유입력 전체를 불필요하게 장기 저장하지 않는다."
+
+이를 **"저장하지 않는다" 가 아니라 "저장할 자리가 없다"** 로 지킨다.
+`RestHistoryEntry` 에 자유 텍스트를 담을 필드가 아예 존재하지 않는다.
+
+`RestHistoryEntryTests.testEncodedKeysAreExactlyTheAllowedSet` 이 인코딩된
+JSON 키 집합을 허용 목록과 정확히 비교한다. 누군가 자유 텍스트 필드를
+추가하면 테스트가 깨진다.
+
+허용 키는 11개다.
+
+```
+id  plan_id  started_at  ended_at
+planned_duration_minutes  actual_duration_seconds
+rest_type  audio  movement  outcome  feedback
+```
+
+### Sprint 10 에 대한 지침
+
+Sprint 10 에서 한 줄 자유 입력이 생긴다. 그때도 **원문을 이 기록에 넣지 않는다.**
+필요하면 파생된 구조값(상태 분류 태그 등)만 새 필드로 추가하고,
+그 필드를 허용 목록에 명시적으로 더한다.
+
+`docs/PRODUCT.md` §12 — "원본 대화 전체를 영구 기억으로 사용하는 구조를 피한다."
+
+### 함께 지키는 것
+
+- 위치·건강 데이터는 담지 않는다. 애초에 수집하지 않는다.
+- 최근 50건만 보관한다. 무한히 쌓이면 보관 범위가 흐려진다.
+- `removeAll()` 경로를 열어 둔다. 삭제 화면은 아직 없지만
+  `docs/PRODUCT.md` §12 가 요구하는 "사용자가 자신의 기록을 삭제할 수 있는 구조" 의 토대다.
+
+---
+
+## D-023. 취소한 쉼은 결과 화면으로 보내지 않는다
+
+- **Sprint**: 7
+- **상태**: 확정 (Product Owner 지시, 2026-08-25)
+- **문제 구분**: D
+
+### 배경
+
+Sprint 1~3 에서는 취소해도 결과 화면으로 보내고 "쉼을 멈췄어요" 를 띄웠다.
+
+### 결정 (Product Owner)
+
+> "취소한 사람에게 '조금 나아졌나요?' 를 물으면 UX가 이상해질 수 있어."
+
+그만두겠다고 한 사람을 붙잡고 질문하지 않는다.
+
+### 저장 규칙
+
+| 상황 | 화면 | 저장 |
+|---|---|---|
+| 정상 완료 + `endCheckin == true` | RestResult 에서 응답 선택 | `completed` + 선택한 `feedback` |
+| 정상 완료 + `endCheckin == false` | 결과 화면 없이 홈 | `completed` + `feedback: nil` |
+| **사용자 취소** | **결과 화면 없이 홈** | **`cancelled` + `feedback: nil`** |
+
+어느 경로든 **정확히 한 번만** 저장한다.
+응답 없이 결과 화면을 벗어나도 기록은 남는다 — `returnHome()` 이 보류 기록을 넘긴다.
+저장 후 수정하는 API 를 두지 않아 저장소가 단순하다.
+
+### 상태 관찰에 대한 주의
+
+취소 후 곧바로 홈으로 돌아가므로 `state` 는 `.cancelled` 를 스쳐 `.idle` 이 된다.
+**취소였다는 사실은 저장된 기록의 `outcome` 이 증명한다.**
+테스트도 `state` 가 아니라 기록을 확인한다.
+
+### 계획 시간과 실제 시간을 모두 남긴다
+
+Product Owner 지시:
+
+> "계획이 10분인데 2분 만에 취소한 사용자와 9분 50초에 취소한 사용자를
+> 똑같이 `cancelled` 로만 보면 나중에 데이터 가치가 떨어져."
+
+```swift
+let plannedDurationMinutes: Int
+let actualDurationSeconds: Int
+```
+
+`actualDurationSeconds` 는 `startedAt` 과 종료 시각의 차이에서 계산하며
+**음수가 되지 않는다.** 기기 시계가 뒤로 가도 0 이다.
+
+`docs/PRODUCT.md` §14 의 성공 지표 **쉼 완료율** 이 이 데이터를 필요로 한다.
+완료만 저장하면 완료율을 계산할 수 없다.
 

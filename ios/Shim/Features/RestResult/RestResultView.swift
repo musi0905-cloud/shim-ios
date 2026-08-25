@@ -6,8 +6,13 @@
 //    질문은 한 번만 한다 — "조금 나아졌나요?"
 //    선택 후 즉시 홈으로 복귀한다.
 //
-//  Sprint 1 범위: 선택값을 저장하지 않는다.
-//  RestFeedback 모델과 로컬 저장은 Sprint 7 이다.
+//  Sprint 7 범위:
+//    선택한 응답이 RestHistoryStore 에 저장된다.
+//    통계 화면이나 기록 조회 UI 는 만들지 않는다 — 제품 철학상 대시보드를
+//    만들지 않는다 (docs/IOS_SPEC.md §8.1).
+//
+//  이 화면은 **정상 완료한 쉼에만** 나타난다.
+//  사용자가 그만둔 쉼은 여기로 오지 않는다 (D-023).
 //
 
 import SwiftUI
@@ -17,38 +22,37 @@ struct RestResultView: View {
 
     /// 화면에 보여줄 선택지.
     ///
-    /// Sprint 7 에서 저장 가능한 `RestFeedback` 모델로 승격된다.
-    /// 지금은 저장하지 않으므로 화면 안에만 둔다.
-    private enum Choice: String, CaseIterable, Identifiable {
-        case better = "조금 나아졌어요"
-        case same = "그대로예요"
-        case worse = "더 불편해요"
+    /// 문구는 표현 계층에 둔다. 저장·전송되는 값은 `RestFeedback` 이다.
+    /// 문구가 바뀌어도 이미 저장된 데이터의 의미는 변하지 않아야 한다.
+    private struct Choice: Identifiable {
+        let feedback: RestFeedback
+        let label: String
+        let identifier: String
 
-        var id: String { rawValue }
-        var identifier: String {
-            switch self {
-            case .better: return "feedbackBetter"
-            case .same: return "feedbackSame"
-            case .worse: return "feedbackWorse"
-            }
-        }
+        var id: String { feedback.rawValue }
     }
+
+    private let choices: [Choice] = [
+        Choice(feedback: .better, label: "조금 나아졌어요", identifier: "feedbackBetter"),
+        Choice(feedback: .same,   label: "그대로예요",     identifier: "feedbackSame"),
+        Choice(feedback: .worse,  label: "더 불편해요",     identifier: "feedbackWorse"),
+    ]
 
     var body: some View {
         VStack(spacing: 32) {
             Spacer()
 
-            Text(headline)
+            Text("조금 나아졌나요?")
                 .font(.title2)
                 .accessibilityIdentifier("resultHeadline")
 
             VStack(spacing: 12) {
-                ForEach(Choice.allCases) { choice in
+                ForEach(choices) { choice in
                     Button {
-                        // Sprint 7 에서 여기에 피드백 저장이 들어간다.
-                        coordinator.returnHome()
+                        // 저장하고 즉시 홈으로 돌아간다.
+                        coordinator.submitFeedback(choice.feedback)
                     } label: {
-                        Text(choice.rawValue)
+                        Text(choice.label)
                             .frame(maxWidth: .infinity, minHeight: 48)
                     }
                     .buttonStyle(.bordered)
@@ -61,10 +65,6 @@ struct RestResultView: View {
         .padding(.horizontal, 24)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
-    }
-
-    private var headline: String {
-        coordinator.finishReason == .cancelled ? "쉼을 멈췄어요" : "조금 나아졌나요?"
     }
 }
 

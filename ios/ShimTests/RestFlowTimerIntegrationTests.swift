@@ -19,19 +19,25 @@ final class RestFlowTimerIntegrationTests: XCTestCase {
 
     private var clock: MutableClock!
     private var scheduler: ManualTickScheduler!
+    private var history: InMemoryRestHistoryStore!
     private var coordinator: RestFlowCoordinator!
 
     override func setUp() async throws {
         try await super.setUp()
         clock = MutableClock()
         scheduler = ManualTickScheduler()
+        history = InMemoryRestHistoryStore()
         coordinator = RestFlowCoordinator(
-            timer: DefaultRestTimerService(clock: clock, scheduler: scheduler)
+            timer: DefaultRestTimerService(clock: clock, scheduler: scheduler),
+            audio: SpyAudioService(),
+            history: history,
+            clock: clock
         )
     }
 
     override func tearDown() async throws {
         coordinator = nil
+        history = nil
         scheduler = nil
         clock = nil
         try await super.tearDown()
@@ -71,19 +77,22 @@ final class RestFlowTimerIntegrationTests: XCTestCase {
 
     // MARK: - Start → Running → User Cancel
 
-    /// 사용자가 그만두면 완료가 아니라 취소로 처리되어야 한다.
+    /// 사용자가 그만두면 완료가 아니라 취소로 기록되어야 한다.
+    ///
+    /// 취소 후에는 곧바로 홈으로 돌아가므로 `state` 는 `.idle` 이다.
+    /// 취소였다는 사실은 저장된 기록이 증명한다 (D-023).
     func testUserCancelIsDistinctFromCompletion() {
         coordinator.start(with: MockRestPlanFactory.defaultPlan())
 
         clock.advance(minutes: 2)
         coordinator.cancel()
 
-        XCTAssertEqual(coordinator.state, .cancelled)
-        XCTAssertEqual(coordinator.finishReason, .cancelled)
-        XCTAssertNotEqual(coordinator.finishReason, .completed)
+        XCTAssertEqual(history.entries.first?.outcome, .cancelled)
+        XCTAssertNotEqual(history.entries.first?.outcome, .completed)
+        XCTAssertEqual(coordinator.state, .idle, "취소 후 즉시 홈으로 돌아간다")
     }
 
-    /// 취소한 뒤 원래 종료 시각이 지나도 완료로 바뀌면 안 된다.
+    /// 취소한 뒤 원래 종료 시각이 지나도 완료 기록이 생기면 안 된다.
     func testCancelledRestDoesNotCompleteLater() {
         coordinator.start(with: MockRestPlanFactory.defaultPlan())
         coordinator.cancel()
@@ -92,8 +101,9 @@ final class RestFlowTimerIntegrationTests: XCTestCase {
         scheduler.fire(times: 5)
         coordinator.handleReturnToForeground()
 
-        XCTAssertEqual(coordinator.state, .cancelled, "취소 상태가 유지되어야 한다")
-        XCTAssertEqual(coordinator.finishReason, .cancelled)
+        XCTAssertEqual(history.entries.count, 1, "기록이 하나뿐이어야 한다")
+        XCTAssertEqual(history.entries.first?.outcome, .cancelled)
+        XCTAssertEqual(coordinator.state, .idle)
     }
 
     // MARK: - background 왕복

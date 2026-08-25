@@ -83,6 +83,9 @@ def check_required_files() -> None:
         "scripts/sprint_files.sh",
         "scripts/generate_test_audio.py",
         "ios/Shim/Resources/Audio/test_ambient.wav",
+        "ios/Shim/Models/RestFeedback.swift",
+        "ios/Shim/Models/RestHistoryEntry.swift",
+        "ios/Shim/Persistence/RestHistoryStore.swift",
         ".github/workflows/ios-sprint0-verify.yml",
     ]
     missing = [p for p in required if not os.path.exists(rel(p))]
@@ -490,6 +493,8 @@ def check_sprint_scope() -> None:
           "import UserNotifications")),
         (("/Services/",), "Service",
          ("import UIKit", "import SwiftUI")),
+        (("/Persistence/",), "Persistence",
+         ("import UIKit", "import SwiftUI", "import AVFoundation")),
         (("/Features/",), "UI",
          ("import AVFoundation", "import UserNotifications")),
     ]

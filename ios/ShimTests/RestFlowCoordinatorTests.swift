@@ -20,18 +20,24 @@ final class RestFlowCoordinatorTests: XCTestCase {
     private var coordinator: RestFlowCoordinator!
     private var clock: MutableClock!
     private var scheduler: ManualTickScheduler!
+    private var history: InMemoryRestHistoryStore!
 
     override func setUp() async throws {
         try await super.setUp()
         clock = MutableClock()
         scheduler = ManualTickScheduler()
+        history = InMemoryRestHistoryStore()
         coordinator = RestFlowCoordinator(
-            timer: DefaultRestTimerService(clock: clock, scheduler: scheduler)
+            timer: DefaultRestTimerService(clock: clock, scheduler: scheduler),
+            audio: SpyAudioService(),
+            history: history,
+            clock: clock
         )
     }
 
     override func tearDown() async throws {
         coordinator = nil
+        history = nil
         scheduler = nil
         clock = nil
         try await super.tearDown()
@@ -75,18 +81,17 @@ final class RestFlowCoordinatorTests: XCTestCase {
         XCTAssertNil(coordinator.activePlan)
     }
 
-    /// Home → RestSession → (중단) → RestResult → Home
-    func testCancelFlowAlsoReachesResultAndHome() {
+    /// Home → RestSession → (중단) → Home
+    ///
+    /// 취소한 사용자는 결과 화면을 거치지 않는다 (D-023).
+    /// 그만두겠다는 사람에게 "조금 나아졌나요?" 를 묻지 않는다.
+    func testCancelReturnsHomeWithoutResultScreen() {
         coordinator.start(with: MockRestPlanFactory.defaultPlan())
         coordinator.cancel()
 
-        XCTAssertEqual(coordinator.state, .cancelled)
-        XCTAssertEqual(coordinator.finishReason, .cancelled)
-        XCTAssertEqual(coordinator.path, [.session, .result])
-
-        coordinator.returnHome()
+        XCTAssertTrue(coordinator.path.isEmpty, "결과 화면을 거치지 않는다")
         XCTAssertEqual(coordinator.state, .idle)
-        XCTAssertTrue(coordinator.path.isEmpty)
+        XCTAssertNil(coordinator.activePlan)
     }
 
     /// endCheckin 이 false 면 결과 화면을 거치지 않고 바로 홈으로 간다.

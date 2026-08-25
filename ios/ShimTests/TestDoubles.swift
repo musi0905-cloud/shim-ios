@@ -197,3 +197,45 @@ final class SpyAudioService: AudioService {
         isPlaying = false
     }
 }
+
+// MARK: - Sprint 7: 기록 저장소
+
+/// 메모리에만 담는 기록 저장소.
+@MainActor
+final class InMemoryRestHistoryStore: RestHistoryStore {
+    private(set) var entries: [RestHistoryEntry] = []
+    private(set) var saveCallCount = 0
+    private(set) var removeAllCallCount = 0
+
+    /// true 면 저장을 조용히 실패시킨다. 저장 실패가 흐름을 막지 않는지 확인할 때 쓴다.
+    var failsSilently = false
+
+    func save(_ entry: RestHistoryEntry) {
+        saveCallCount += 1
+        guard !failsSilently else { return }
+        entries.insert(entry, at: 0)
+    }
+
+    func recentEntries(limit: Int) -> [RestHistoryEntry] {
+        guard limit > 0 else { return [] }
+        return Array(entries.prefix(limit))
+    }
+
+    func removeAll() {
+        removeAllCallCount += 1
+        entries.removeAll()
+    }
+}
+
+/// 테스트 전용 UserDefaults suite 를 만든다.
+///
+/// `.standard` 를 건드리면 테스트끼리 간섭한다.
+@MainActor
+enum TestDefaults {
+    static func make(_ name: String = #function) -> UserDefaults {
+        let suite = "shim.tests.\(name).\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        return defaults
+    }
+}
