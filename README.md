@@ -5,16 +5,18 @@
 >
 > 「쉼」은 **추천 앱이 아니라 실행 앱**이다. 사용자를 앱에 오래 붙잡지 않는다.
 
-**현재 상태: Sprint 2 — Timer Engine ✅ DONE (2026-08-25)**
+**현재 상태: Sprint 3 — Audio PoC 🟡 IMPLEMENTED / DEVICE VERIFICATION BLOCKED**
 
 > 이 저장소는 `musi0905-cloud/App`에서 「쉼」 관련 파일만 분리해 만들었다 (`docs/DECISIONS.md` D-002).
 > 무관한 Google Apps Script 프로젝트는 `App` 저장소에 그대로 남아 있다.
 
 [![Sprint 0 Verify (iOS)](https://github.com/musi0905-cloud/shim-ios/actions/workflows/ios-sprint0-verify.yml/badge.svg)](https://github.com/musi0905-cloud/shim-ios/actions/workflows/ios-sprint0-verify.yml)
 
-Sprint 0·1·2 모두 CI 검증을 통과했다 ([Run #6](https://github.com/musi0905-cloud/shim-ios/actions/runs/32796901669) — `BUILD SUCCEEDED` / `TEST SUCCEEDED` 64 tests).
-상세 결과는 [`docs/SPRINTS.md`](docs/SPRINTS.md)「CI 검증 결과 기록」참고.
-**Sprint 3(Audio PoC)는 Product Owner 승인 후 시작한다.**
+Sprint 0·1·2 는 DONE. Sprint 3 은 **Gate A(구현·CI) 완료 / Gate B(실기기 검증) 대기** 상태다
+([Run #8](https://github.com/musi0905-cloud/shim-ios/actions/runs/32798630436) — `BUILD SUCCEEDED` / `TEST SUCCEEDED` 103 tests).
+
+> ⚠️ **CI 통과는 실기기 검증을 대체하지 않는다.** Simulator 는 실기기가 아니다.
+> Background Audio·화면 잠금 재생·interruption 은 [`docs/DEVICE_VERIFICATION.md`](docs/DEVICE_VERIFICATION.md) 절차로 iPhone 에서 확인해야 한다.
 
 ---
 
@@ -28,7 +30,8 @@ Google Drive 문서가 **최상위 제품 기준**이고, 이 저장소의 문�
 | [`docs/IOS_SPEC.md`](docs/IOS_SPEC.md) | 02_쉼 iOS 개발 명세서 v0.1 | 아키텍처, RestPlan, Service 명세 |
 | [`CLAUDE.md`](CLAUDE.md) | 03_쉼 Claude Code 운영규칙 v0.1 | 개발 운영규칙 |
 | [`docs/SPRINTS.md`](docs/SPRINTS.md) | 04_쉼 Sprint Backlog v0.1 | Sprint 0~13 계획 및 상태 |
-| [`docs/DECISIONS.md`](docs/DECISIONS.md) | — | 확정된 기술 결정 기록 (D-001~D-009) |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | — | 확정된 기술 결정 기록 (D-001~D-020) |
+| [`docs/DEVICE_VERIFICATION.md`](docs/DEVICE_VERIFICATION.md) | — | 실기기 검증 절차와 체크리스트 |
 
 **문서 간 충돌 시 우선순위**: 제품 기준서 > iOS 개발 명세서 > 운영규칙 > Sprint Backlog
 

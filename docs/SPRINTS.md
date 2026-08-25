@@ -378,12 +378,130 @@ Sprint 1 코드와 무관했다. 재실행으로 넘기지 않고 원인을 고�
 - 오디오 오류 처리
 - RestPlan audioMode 연동
 
-### Acceptance Criteria
-- 실제 iPhone에서 쉼 시작 시 오디오가 재생된다.
-- 앱이 백그라운드로 가도 의도된 정책대로 동작한다.
-- 정상 종료/취소 시 오디오가 멈춘다.
-- 다른 오디오와 충돌 시 동작이 보고된다.
-- **실기기 미검증이면 DONE 처리하지 않는다.**
+### 두 Gate 로 관리한다 (Product Owner 결정, 2026-08-25)
+
+```
+Gate A — Implementation / CI          Gate B — Physical Device Verification
+  AudioService 구현                     실제 iPhone Background Audio
+  RestPlan 연동                         화면 잠금 상태 재생
+  CI Build / Test                       interruption / route 검증
+        ↓                                       ↓
+   CODE COMPLETE  ────────────────────────►   DONE
+```
+
+**Gate A 가 통과해도 Gate B 없이는 DONE 이 아니다.**
+
+### Gate A — Implementation / CI ✅ 완료 (2026-08-25)
+
+| # | Acceptance Criteria | 결과 |
+|---|---|---|
+| 1 | 실제 iPhone 에서 쉼 시작 시 오디오가 재생된다 | ⏳ **Gate B** |
+| 2 | 앱이 background 로 가도 의도된 정책대로 동작한다 | ⏳ **Gate B** |
+| 3 | 정상 종료·취소 시 오디오가 멈춘다 | ✅ 코드 검증 완료 / 실기기 미검증 |
+| 4 | 다른 오디오와 충돌 시 동작이 보고된다 | ⏳ **Gate B** |
+
+**구현 요구사항 12개 이행**
+
+| # | 요구 | 이행 |
+|---|---|---|
+| 1 | `AudioService` protocol + AVFoundation 구현 | ✅ `AudioService` / `DefaultAudioService` / `AudioPlatform` |
+| 2 | View 가 AVFoundation 을 직접 호출하지 않음 | ✅ 계층별 import 가드로 강제 (D-017) |
+| 3 | `ValidatedRestPlan.audio` 로 실행 | ✅ `startAudio(mode:)` |
+| 4 | 외부 저작권 음원 미사용 | ✅ 자체 생성만 사용 |
+| 5 | 테스트 음원 자체 생성 | ✅ `scripts/generate_test_audio.py` (D-018) |
+| 6 | 테스트 음원임을 문서에 명시 | ✅ README「테스트 오디오에 대하여」 |
+| 7 | `.playback` 우선 | ✅ `.playback` / `.default` / `UIBackgroundModes = audio` |
+| 8 | 시작 시 자동 재생, 종료·취소 시 stop/cleanup | ✅ 통합 테스트로 고정 |
+| 9 | UI 에 Pause/Resume 없음 | ✅ 프로토콜에 `pause()` 자체가 없다 |
+| 10 | OS interruption 내부 pause/resume 허용 | ✅ 전화·Siri·이어폰 분리 5종 테스트 |
+| 11 | 오디오 실패가 crash 로 이어지지 않음 | ✅ 실패 경로 7종 테스트 |
+| 12 | 실패 시 중단 여부를 자동 결정하지 않음 | ✅ `audioError` 로 드러내기만 함. **D-019 PO 결정 대기** |
+
+**최소 테스트 12종**
+
+| 요구 항목 | 테스트 |
+|---|---|
+| prepare 성공 | `testPrepareSucceeds` |
+| play 성공 | `testPlaySucceeds` |
+| stop 성공 | `testStopSucceeds` |
+| 중복 play 처리 | `testDuplicatePlayIsIgnored` |
+| stop 중복 호출 안전성 | `testRepeatedStopIsSafe` |
+| 지원하지 않는 AudioMode | `testUnsupportedModeThrows` |
+| 파일 없음 | `testMissingResourceThrows` |
+| 재생 초기화 실패 | `testPreparationFailureThrows` |
+| RestSession 시작 시 audio 실행 | `testStartingRestStartsAudio` |
+| cancel 시 audio stop | `testAudioStopsWhenUserCancels` |
+| timer 정상 종료 시 audio stop | `testAudioStopsWhenTimerCompletes` |
+| audio 오류 시 crash 없음 | `testAudioPrepareFailureDoesNotStopTheRest` 외 3종 |
+
+### Gate A CI 검증 결과 기록
+
+**Run**: [#8](https://github.com/musi0905-cloud/shim-ios/actions/runs/32798630436) · conclusion `success`
+**Commit**: `57b9ad3c95c55fd1fb37df84218470a99cc69215`
+**환경**: macos-latest / macOS 26.5.2 (arm64) · Xcode 26.6 · iPhone Air (iOS 26.5) · XcodeGen 재생성
+**Artifact**: `sprint0-verify-logs-8` — 253개 파일, 233 KB
+
+```
+** BUILD SUCCEEDED **
+** TEST SUCCEEDED **   103 tests, 0 failures
+```
+
+| 테스트 파일 | 개수 |
+|---|---:|
+| `AudioServiceTests` (+ `AudioResourceTests`) | 28 |
+| `RestTimerServiceTests` | 17 |
+| `RestPlanDecodingTests` | 12 |
+| `RestPlanValidatorTests` | 12 |
+| `RestFlowCoordinatorTests` | 11 |
+| `RestFlowAudioIntegrationTests` | 11 |
+| `RestFlowTimerIntegrationTests` | 10 |
+| `ShimSmokeTests` | 2 |
+| **합계** | **103** |
+
+### Gate A 중 발견하고 고친 문제
+
+[Run #7](https://github.com/musi0905-cloud/shim-ios/actions/runs/32798165809) 에서
+103개 중 **정확히 1개**가 실패했다 — `testBackgroundAudioCapabilityIsDeclared`.
+
+`INFOPLIST_KEY_UIBackgroundModes` 가 생성된 `Info.plist` 에 조용히 반영되지 않았다.
+빌드도 되고 Simulator foreground 재생도 되므로 **실기기 Gate B 에 가서야
+"홈 화면으로 나가니 소리가 끊긴다" 로 드러났을 문제**다.
+번들 `Info.plist` 를 직접 읽는 테스트를 CI 에 넣어둔 덕분에 코드 단계에서 잡혔다.
+실제 `ios/Shim-Info.plist` 로 교체해 해결했다 — **D-020**.
+
+### Gate B — Physical Device Verification ⏳ BLOCKED
+
+**실기기 검증 환경이 아직 없다.** 이 개발 세션은 Linux 이고 iPhone 을 연결할 수 없다 (D-001).
+CI 의 macOS runner 도 Simulator 만 제공한다. **Simulator 는 실기기가 아니다.**
+
+검증해야 할 10개 항목과 iPhone 설치 절차는 **`docs/DEVICE_VERIFICATION.md`** 에 정리했다.
+
+핵심 확인 흐름:
+
+```
+쉼 시작 → 오디오 자동 시작 → 홈 화면 이동 → 계속 재생
+       → 화면 잠금 → 계속 재생 → 쉼 취소/종료 → 즉시 정지 + 세션 정리
+```
+
+**Gate B 가 끝나기 전까지 Sprint 3 은 DONE 이 아니다.**
+
+### 파일 변경 기록
+
+`./scripts/sprint_files.sh e5c01ba 57b9ad3` 산출값이다.
+범위는 Gate A 구현 커밋까지이며 이 기록 커밋은 포함하지 않는다.
+
+| 구분 | 개수 |
+|---|---:|
+| 생성 | 8 |
+| 수정 | 8 |
+| 삭제 | 0 |
+
+### 이 Sprint 의 설계 결정
+
+- **D-017** AudioService 경계. 사용자 Pause 금지 / OS interruption 내부 pause 허용
+- **D-018** 테스트 음원은 프로젝트가 직접 생성한다. 제품용 콘텐츠 아님
+- **D-019** 오디오 실패 시 쉼 중단 여부 — **PO 결정 대기**
+- **D-020** Background Audio 는 실제 Info.plist 로 선언한다
 
 ---
 

@@ -227,9 +227,25 @@ CI 결과를 확인하지 않은 상태에서 빌드·테스트가 통과했다�
 | 0 — 개발 환경 및 저장소 기초 | ✅ DONE | [Run #1](https://github.com/musi0905-cloud/shim-ios/actions/runs/32792825752) |
 | 1 — Foundation & RestPlan | ✅ DONE | [Run #4](https://github.com/musi0905-cloud/shim-ios/actions/runs/32794940622) — 37 tests |
 | 2 — Timer Engine | ✅ DONE | [Run #6](https://github.com/musi0905-cloud/shim-ios/actions/runs/32796901669) — 64 tests |
-| 3 — Audio PoC | READY | Product Owner 승인 대기 |
+| 3 — Audio PoC | 🟡 **IMPLEMENTED / DEVICE VERIFICATION BLOCKED** | Gate A: [Run #8](https://github.com/musi0905-cloud/shim-ios/actions/runs/32798630436) — 103 tests / Gate B: 대기 |
 
 **다음 Sprint 는 Product Owner 승인 후 시작한다.** (운영규칙 §3)
+
+### 실기기 검증은 CI 로 대체할 수 없다
+
+**Simulator 는 실기기가 아니다.** 다음은 반드시 iPhone 에서 확인해야 한다.
+
+| Sprint | 항목 |
+|---|---|
+| 3 — Audio | Background Audio, 화면 잠금 재생, 전화·Siri interruption, 이어폰 분리 |
+| 4 — Brightness | `UIScreen.brightness` 적용·복원 |
+| 5 — Notification | 종료 알림 수신, 권한 거부 fallback |
+
+절차는 `docs/DEVICE_VERIFICATION.md`.
+실기기 검증 전에는 **"구현 완료 / 실기기 미검증"** 으로 보고하고 DONE 처리하지 않는다.
+
+빌드 설정으로 선언한 capability 는 "설정했으니 됐다" 고 믿지 않는다.
+번들 산출물을 직접 확인하는 테스트를 함께 둔다 (D-020).
 
 ### 쉼 타이머의 규칙 (Sprint 2)
 
